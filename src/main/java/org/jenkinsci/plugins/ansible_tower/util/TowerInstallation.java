@@ -8,6 +8,7 @@ import static com.cloudbees.plugins.credentials.CredentialsMatchers.instanceOf;
 import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
 import com.cloudbees.plugins.credentials.common.UsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
+import jenkins.model.Jenkins;
 import org.jenkinsci.plugins.plaincredentials.StringCredentials;
 import hudson.Extension;
 import hudson.model.AbstractDescribableImpl;
@@ -21,6 +22,7 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
+import org.kohsuke.stapler.verb.POST;
 
 import java.util.List;
 
@@ -78,12 +80,16 @@ public class TowerInstallation extends AbstractDescribableImpl<TowerInstallation
     @Extension
     public static class TowerInstallationDescriptor extends Descriptor<TowerInstallation> {
 
+        // This requires a POST method to protect from CSFR
+        @POST
         public FormValidation doTestTowerConnection(
                 @QueryParameter("towerURL") final String towerURL,
                 @QueryParameter("towerCredentialsId") final String towerCredentialsId,
                 @QueryParameter("towerTrustCert") final boolean towerTrustCert,
                 @QueryParameter("enableDebugging") final boolean enableDebugging
         ) {
+            // Also, validate that we are an Administrator
+            Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
             TowerLogger.writeMessage("Starting to test connection with ("+ towerURL +") and ("+ towerCredentialsId +") and ("+ towerTrustCert +") with debugging ("+ enableDebugging +")");
             TowerConnector testConnector = TowerInstallation.getTowerConnectorStatic(towerURL, towerCredentialsId, towerTrustCert, enableDebugging);
             try {
@@ -94,7 +100,11 @@ public class TowerInstallation extends AbstractDescribableImpl<TowerInstallation
             }
         }
 
+        // This requires a POST method to protect from CSFR
+        @POST
         public ListBoxModel doFillTowerCredentialsIdItems(@AncestorInPath Project project) {
+            // Also, validate that we are an Administrator
+            Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
             return new StandardListBoxModel().withEmptySelection().withMatching(
                     instanceOf(UsernamePasswordCredentials.class),
                     CredentialsProvider.lookupCredentials(StandardUsernameCredentials.class, project)
