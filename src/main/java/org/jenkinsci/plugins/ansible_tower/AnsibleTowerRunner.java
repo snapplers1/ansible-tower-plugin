@@ -204,6 +204,7 @@ public class AnsibleTowerRunner {
                 logger.println("Receiving from Jenkins job '" + entrySet.getKey() + "' with value '" + entrySet.getValue() + "'");
             }
             envVars.put(entrySet.getKey(), entrySet.getValue());
+            towerResults.put(entrySet.getKey(), entrySet.getValue());
         }
         if (envVars.size() != 0) {
             if (Jenkins.getInstance().getPlugin("envinject") == null) {
