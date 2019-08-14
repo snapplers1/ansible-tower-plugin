@@ -7,10 +7,12 @@ package org.jenkinsci.plugins.ansible_tower;
 
 import hudson.EnvVars;
 import hudson.FilePath;
+import hudson.Plugin;
 import hudson.model.Run;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
 import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerException;
+import org.jenkinsci.plugins.ansible_tower.util.TowerJob;
 import org.jenkinsci.plugins.ansible_tower.util.TowerConnector;
 import org.jenkinsci.plugins.ansible_tower.util.TowerInstallation;
 import org.jenkinsci.plugins.envinject.service.EnvInjectActionSetter;
@@ -25,6 +27,17 @@ public class AnsibleTowerRunner {
             boolean importTowerLogs, boolean removeColor, EnvVars envVars, String templateType,
             boolean importWorkflowChildLogs, FilePath ws, Run<?, ?> run, Properties towerResults
     ) {
+        return this.runJobTemplate(logger, towerServer, jobTemplate, jobType, extraVars, limit, jobTags, skipJobTags, inventory,
+                credential, verbose, importTowerLogs, removeColor, envVars, templateType, importWorkflowChildLogs, ws,
+                run, towerResults, false);
+    }
+
+    public boolean runJobTemplate(
+            PrintStream logger, String towerServer, String jobTemplate, String jobType, String extraVars, String limit,
+            String jobTags, String skipJobTags, String inventory, String credential, boolean verbose,
+            boolean importTowerLogs, boolean removeColor, EnvVars envVars, String templateType,
+            boolean importWorkflowChildLogs, FilePath ws, Run<?, ?> run, Properties towerResults, boolean async
+    ) {
         if (verbose) {
             logger.println("Beginning Ansible Tower Run on " + towerServer);
         }
@@ -36,12 +49,14 @@ public class AnsibleTowerRunner {
             return false;
         }
 
-        if (templateType == null || (!templateType.equalsIgnoreCase(TowerConnector.WORKFLOW_TEMPLATE_TYPE) && !templateType.equalsIgnoreCase(TowerConnector.JOB_TEMPLATE_TYPE))) {
-            logger.println("ERROR: Template type " + templateType + " was invalid");
+        TowerConnector myTowerConnection = towerConfigToRunOn.getTowerConnector();
+        TowerJob myJob = new TowerJob(myTowerConnection);
+        try {
+            myJob.setTemplateType(templateType);
+        } catch(AnsibleTowerException e) {
+            logger.println("ERROR: "+ e);
             return false;
         }
-
-        TowerConnector myTowerConnection = towerConfigToRunOn.getTowerConnector();
 
         // If they came in empty then set them to null so that we don't pass a nothing through
         if (jobTemplate != null && jobTemplate.equals("")) {
@@ -106,13 +121,13 @@ public class AnsibleTowerRunner {
         }
 
         if (expandedSkipJobTags != null && expandedSkipJobTags.equalsIgnoreCase("")) {
-            if (!expandedSkipJobTags.startsWith(",")) {
+            if(!expandedSkipJobTags.startsWith(",")) {
                 expandedSkipJobTags = "," + expandedSkipJobTags;
             }
         }
 
         // Get the job template.
-        JSONObject template = null;
+        JSONObject template;
         try {
             template = myTowerConnection.getJobTemplate(expandedJobTemplate, templateType);
         } catch (AnsibleTowerException e) {
@@ -152,32 +167,44 @@ public class AnsibleTowerRunner {
         if (verbose) {
             logger.println("Requesting tower to run " + templateType + " template " + expandedJobTemplate);
         }
-        int myJobID;
         try {
-            myJobID = myTowerConnection.submitTemplate(template.getInt("id"), expandedExtraVars, expandedLimit, expandedJobTags, expandedSkipJobTags, jobType, expandedInventory, expandedCredential, templateType);
+            myJob.setJobId(myTowerConnection.submitTemplate(template.getInt("id"), expandedExtraVars, expandedLimit, expandedJobTags, expandedSkipJobTags, jobType, expandedInventory, expandedCredential, templateType));
         } catch (AnsibleTowerException e) {
             logger.println("ERROR: Unable to request job template invocation " + e.getMessage());
             return false;
         }
 
-        String jobURL = myTowerConnection.getJobURL(myJobID, templateType);
-
+        String jobURL = myTowerConnection.getJobURL(myJob.getJobID(), templateType);
         logger.println("Template Job URL: " + jobURL);
 
-        myTowerConnection.setLogTowerEvents(importTowerLogs);
-        myTowerConnection.setJenkinsLogger(logger);
+        towerResults.put("JOB_ID", Integer.toString(myJob.getJobID()));
+        towerResults.put("JOB_URL", jobURL);
+
+
         myTowerConnection.setRemoveColor(removeColor);
+        myTowerConnection.setGetWorkflowChildLogs(importWorkflowChildLogs);
+
+
+        if (async) {
+            towerResults.put("job", myJob);
+            return true;
+        }
+
         boolean jobCompleted = false;
         while (!jobCompleted) {
             // First log any events if the user wants them
-            try {
-                myTowerConnection.logEvents(myJobID, templateType, importWorkflowChildLogs);
-            } catch (AnsibleTowerException e) {
-                logger.println("ERROR: Failed to get job events from tower: " + e.getMessage());
-                return false;
+            if(importTowerLogs) {
+                try {
+                    for (String event : myJob.getLogs()) {
+                        logger.println(event);
+                    }
+                } catch (AnsibleTowerException e) {
+                    logger.println("ERROR: Failed to get job events from tower: " + e.getMessage());
+                    return false;
+                }
             }
             try {
-                jobCompleted = myTowerConnection.isJobCompleted(myJobID, templateType);
+                jobCompleted = myJob.isComplete();
             } catch (AnsibleTowerException e) {
                 logger.println("ERROR: Failed to get job status from Tower: " + e.getMessage());
                 return false;
@@ -191,14 +218,35 @@ public class AnsibleTowerRunner {
                 }
             }
         }
+        // One final log of events (if we want them)
+        // Note, that a job can complete long before Tower has finished consuming the logs. This can cause incomplete
+        //    logs within Jenkins.
+        if(importTowerLogs) {
+            try {
+                for (String event : myJob.getLogs()) {
+                    logger.println(event);
+                }
+            } catch (AnsibleTowerException e) {
+                logger.println("ERROR: Failed to get final job events from tower: " + e.getMessage());
+                return false;
+            }
+        }
+
+        boolean wasSuccessful;
         try {
-            myTowerConnection.logEvents(myJobID, templateType, importWorkflowChildLogs);
-        } catch (AnsibleTowerException e) {
-            logger.println("ERROR: Failed to get final job events from tower: " + e.getMessage());
+            wasSuccessful = myJob.wasSuccessful();
+        } catch(AnsibleTowerException e) {
+            logger.println("ERROR: Failed to get job compltion status: "+ e.getMessage());
             return false;
         }
 
-        HashMap<String, String> jenkinsVariables = myTowerConnection.getJenkinsExports();
+        HashMap<String, String> jenkinsVariables;
+        try {
+            jenkinsVariables = myJob.getExports();
+        } catch(AnsibleTowerException e) {
+            logger.println("Failed to get exported variables: "+ e);
+            return false;
+        }
         for (Map.Entry<String, String> entrySet : jenkinsVariables.entrySet()) {
             if (verbose) {
                 logger.println("Receiving from Jenkins job '" + entrySet.getKey() + "' with value '" + entrySet.getValue() + "'");
@@ -207,9 +255,14 @@ public class AnsibleTowerRunner {
             towerResults.put(entrySet.getKey(), entrySet.getValue());
         }
         if (envVars.size() != 0) {
-            if (Jenkins.getInstance().getPlugin("envinject") == null) {
-                logger.println("Found environment variables to inject but the EnvInject plugin was not found");
-            } else {
+            Plugin envInjectPlugin = null;
+            try {
+                envInjectPlugin = Objects.requireNonNull(Jenkins.getInstance()).getPlugin("envinject");
+            } catch(NullPointerException e) {
+                // We don't care if we get a NPE here
+            }
+
+            if(envInjectPlugin != null) {
                 EnvInjectActionSetter envInjectActionSetter = new EnvInjectActionSetter(ws);
                 try {
                     envInjectActionSetter.addEnvVarsToRun(run, envVars);
@@ -220,29 +273,15 @@ public class AnsibleTowerRunner {
             }
         }
 
-        boolean failed = !isJobSuccessful(logger, verbose, templateType, myTowerConnection, myJobID);
-
-        towerResults.put("JOB_ID", Integer.toString(myJobID));
-        towerResults.put("JOB_URL", jobURL);
-        towerResults.put("JOB_RESULT", failed ? "FAILED" : "SUCCESS");
-
-        return !failed;
-    }
-
-    private boolean isJobSuccessful(PrintStream logger, boolean verbose, String templateType, TowerConnector myTowerConnection, int myJobID) {
-        try {
-            if (myTowerConnection.isJobFailed(myJobID, templateType)) {
-                logger.println("Tower failed to complete the requested job");
-                return false;
-            } else {
-                if (verbose) {
-                    logger.println("Tower completed the requested job");
-                }
-                return true;
-            }
-        } catch (AnsibleTowerException e) {
-            logger.println("ERROR: Failed to job failure status from Tower: " + e.getMessage());
-            return false;
+        if(wasSuccessful) {
+            logger.println("Tower completed the requested job");
+        } else {
+            logger.println("Tower failed to complete the requested job");
         }
+
+        towerResults.put("JOB_RESULT", wasSuccessful ? "SUCCESS" : "FAILED");
+
+        return wasSuccessful;
     }
+
 }

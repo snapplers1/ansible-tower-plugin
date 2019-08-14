@@ -43,12 +43,14 @@ public class AnsibleTowerStep extends AbstractStepImpl {
     private String templateType             = "job";
     private Boolean importWorkflowChildLogs = false;
     private Boolean throwExceptionWhenFail  = true;
+    private Boolean async                   = false;
 
     @DataBoundConstructor
     public AnsibleTowerStep(
             @Nonnull String towerServer, @Nonnull String jobTemplate, String jobType, String extraVars, String jobTags,
             String skipJobTags, String limit, String inventory, String credential, Boolean verbose,
-            Boolean importTowerLogs, Boolean removeColor, String templateType, Boolean importWorkflowChildLogs, Boolean throwExceptionWhenFail
+            Boolean importTowerLogs, Boolean removeColor, String templateType, Boolean importWorkflowChildLogs,
+            Boolean throwExceptionWhenFail, Boolean async
     ) {
         this.towerServer = towerServer;
         this.jobTemplate = jobTemplate;
@@ -65,6 +67,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
         this.templateType = templateType;
         this.importWorkflowChildLogs = importWorkflowChildLogs;
         this.throwExceptionWhenFail = throwExceptionWhenFail;
+        this.async = async;
     }
 
     @Nonnull
@@ -84,6 +87,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
     public String getTemplateType()             { return templateType; }
     public Boolean getImportWorkflowChildLogs() { return importWorkflowChildLogs; }
     public Boolean getThrowExceptionWhenFail()  { return throwExceptionWhenFail; }
+    public Boolean getAsync()                   { return async; }
 
     @DataBoundSetter
     public void setTowerServer(String towerServer) { this.towerServer = towerServer; }
@@ -115,6 +119,8 @@ public class AnsibleTowerStep extends AbstractStepImpl {
     public void setImportWorkflowChildLogs(Boolean importWorkflowChildLogs) { this.importWorkflowChildLogs = importWorkflowChildLogs; }
     @DataBoundSetter
     public void setThrowExceptionWhenFail(Boolean throwExceptionWhenFail) { this.throwExceptionWhenFail = throwExceptionWhenFail; }
+    @DataBoundSetter
+    public void setAsync(Boolean async) { this.async = async; }
 
     public boolean isGlobalColorAllowed() {
         System.out.println("Using the class is global color allowed");
@@ -138,6 +144,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
         public static final String templateType             = AnsibleTower.DescriptorImpl.templateType;
         public static final Boolean importWorkflowChildLogs = AnsibleTower.DescriptorImpl.importWorkflowChildLogs;
         public static final Boolean throwExceptionWhenFail  = AnsibleTower.DescriptorImpl.throwExceptionWhenFail;
+        public static final Boolean async                   = AnsibleTower.DescriptorImpl.async;
 
         public DescriptorImpl() {
             super(AnsibleTowerStepExecution.class);
@@ -243,11 +250,13 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             if(step.getImportWorkflowChildLogs() != null) { importWorkflowChildLogs = step.getImportWorkflowChildLogs(); }
             boolean throwExceptionWhenFail = true;
             if(step.getThrowExceptionWhenFail() != null) { throwExceptionWhenFail = step.getThrowExceptionWhenFail(); }
+            boolean async = false;
+            if(step.getAsync() != null) { async = step.getAsync(); }
             Properties map = new Properties();
             boolean runResult = runner.runJobTemplate(
                     listener.getLogger(), step.getTowerServer(), step.getJobTemplate(), jobType, extraVars,
                     limit, tags, skipTags, inventory, credential, verbose, importTowerLogs, removeColor, envVars,
-                    templateType, importWorkflowChildLogs, ws, run, map
+                    templateType, importWorkflowChildLogs, ws, run, map, async
             );
             if(!runResult && throwExceptionWhenFail) {
                 throw new AbortException("Ansible Tower build step failed");

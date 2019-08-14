@@ -10,9 +10,7 @@ import org.apache.http.Header;
 import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerDoesNotSupportAuthtoken;
 import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerException;
 
-import java.io.IOException;
-import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
@@ -44,7 +42,7 @@ import org.apache.http.protocol.HTTP;
 import org.apache.http.util.EntityUtils;
 import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerItemDoesNotExist;
 
-public class TowerConnector {
+public class TowerConnector implements Serializable {
     private static final int GET = 1;
     private static final int POST = 2;
     public static final String JOB_TEMPLATE_TYPE = "job";
@@ -59,15 +57,13 @@ public class TowerConnector {
     private String password = null;
     private TowerVersion towerVersion = null;
     private boolean trustAllCerts = true;
+    private boolean importChildWorkflowLogs = false;
     private TowerLogger logger = new TowerLogger();
-    HashMap<Integer, Integer> logIdForWorkflows = new HashMap<Integer, Integer>();
-    HashMap<Integer, Integer> logIdForJobs = new HashMap<Integer, Integer>();
+    private HashMap<Integer, Integer> logIdForWorkflows = new HashMap<Integer, Integer>();
+    private HashMap<Integer, Integer> logIdForJobs = new HashMap<Integer, Integer>();
 
-    private boolean logTowerEvents = false;
-    private PrintStream jenkinsLogger = null;
     private boolean removeColor = true;
     private HashMap<String, String> jenkinsExports = new HashMap<String, String>();
-
 
     public TowerConnector(String url, String username, String password) { this(url, username, password, null, false, false); }
 
@@ -94,12 +90,11 @@ public class TowerConnector {
     public void setTrustAllCerts(boolean trustAllCerts) {
         this.trustAllCerts = trustAllCerts;
     }
-    public void setLogTowerEvents(boolean logTowerEvents) { this.logTowerEvents = logTowerEvents; }
-    public void setJenkinsLogger(PrintStream jenkinsLogger) { this.jenkinsLogger = jenkinsLogger;}
     public void setDebug(boolean debug) {
         logger.setDebugging(debug);
     }
     public void setRemoveColor(boolean removeColor) { this.removeColor = removeColor;}
+    public void setGetWorkflowChildLogs(boolean importChildWorkflowLogs) { this.importChildWorkflowLogs = importChildWorkflowLogs; }
     public HashMap<String, String> getJenkinsExports() { return jenkinsExports; }
 
     private DefaultHttpClient getHttpClient() throws AnsibleTowerException {
@@ -682,21 +677,24 @@ public class TowerConnector {
         return isJobCompleted(jobID, templateType);
     }
 
-    public void logEvents(int jobID, String templateType, boolean importWorkflowChildLogs) throws AnsibleTowerException {
+    public Vector<String> getLogEvents(int jobID, String templateType) throws AnsibleTowerException {
+        Vector<String> events = new Vector<String>();
         checkTemplateType(templateType);
         if(templateType.equalsIgnoreCase(JOB_TEMPLATE_TYPE)) {
-            logJobEvents(jobID);
+            events.addAll(logJobEvents(jobID));
         } else if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)){
-            logWorkflowEvents(jobID, importWorkflowChildLogs);
+            events.addAll(logWorkflowEvents(jobID, this.importChildWorkflowLogs));
         } else {
             throw new AnsibleTowerException("Tower Connector does not know how to log events for a "+ templateType);
         }
+        return events;
     }
 
     private static String UNIFIED_JOB_TYPE = "unified_job_type";
     private static String UNIFIED_JOB_TEMPLATE = "unified_job_template";
 
-    private void logWorkflowEvents(int jobID, boolean importWorkflowChildLogs) throws AnsibleTowerException {
+    private Vector<String> logWorkflowEvents(int jobID, boolean importWorkflowChildLogs) throws AnsibleTowerException {
+        Vector<String> events = new Vector<String>();
         if(!this.logIdForWorkflows.containsKey(jobID)) { this.logIdForWorkflows.put(jobID, 0); }
         HttpResponse response = makeRequest(GET, "/workflow_jobs/"+ jobID +"/workflow_nodes/?id__gt="+this.logIdForWorkflows.get(jobID));
 
@@ -733,50 +731,44 @@ public class TowerConnector {
                             job.getString("status").equalsIgnoreCase("pending")
                     ) {
                         // Here we want to return. Otherwise we might "loose" things.
-                        // For example, say there are three nodes in the pipeline.
+                        // For async_pipeline, say there are three nodes in the pipeline.
                         // Node 1 takes a long time, Node 2 which runs in parallel is quick
                         // If Node 2 executes second and completed we will use the ID of node 2 as the next ID.
                         // Node 1 results will be lost because node 2 has already finished.
                         // Returning will prevent this from happening.
-                        return;
+                        return events;
                     }
 
                     if(eventId > this.logIdForWorkflows.get(jobID)) { this.logIdForWorkflows.put(jobID, eventId); }
-                    jenkinsLogger.println(job.getString("name") +" => "+ job.getString("status") +" "+ this.getJobURL(job.getInt("id"), JOB_TEMPLATE_TYPE));
+                    events.addAll(logLine(job.getString("name") +" => "+ job.getString("status") +" "+ this.getJobURL(job.getInt("id"), JOB_TEMPLATE_TYPE)));
 
                     if(importWorkflowChildLogs) {
                         if(templateType.getString(UNIFIED_JOB_TYPE).equalsIgnoreCase("job")) {
                             // We only need to call this once because the job is completed at this point
-                            logJobEvents(job.getInt("id"));
+                            events.addAll(logJobEvents(job.getInt("id")));
                         } else if(templateType.getString(UNIFIED_JOB_TYPE).equalsIgnoreCase("project_update")) {
-                            logProjectSync(job.getInt("id"));
+                            events.addAll(logProjectSync(job.getInt("id")));
                         } else if(templateType.getString(UNIFIED_JOB_TYPE).equalsIgnoreCase("inventory_update")) {
-                            logInventorySync(job.getInt("id"));
+                            events.addAll(logInventorySync(job.getInt("id")));
                         } else {
-                            jenkinsLogger.println("Unknown job type in workflow: "+ templateType.getString(UNIFIED_JOB_TYPE));
+                            events.addAll(logLine("Unknown job type in workflow: "+ templateType.getString(UNIFIED_JOB_TYPE)));
                         }
                     }
                     // Print two spaces to put some space between this and the next task.
-                    jenkinsLogger.println("");
-                    jenkinsLogger.println("");
+                    events.addAll(logLine(""));
+                    events.addAll(logLine(""));
                 }
             }
         } else {
             throw new AnsibleTowerException("Unexpected error code returned ("+ response.getStatusLine().getStatusCode() +")");
         }
-
+        return events;
     }
 
-    private void logLine(String output) throws AnsibleTowerException {
+    private Vector<String> logLine(String output) throws AnsibleTowerException {
+        Vector<String> return_lines = new Vector<String>();
         String[] lines = output.split("\\r\\n");
         for(String line : lines) {
-            if(removeColor) {
-                // This regex was found on https://stackoverflow.com/questions/14652538/remove-ascii-color-codes
-                line = removeColor(line);
-            }
-            if(logTowerEvents) {
-                jenkinsLogger.println(line);
-            }
             // Even if we don't log, we are going to see if this line contains the string JENKINS_EXPORT VAR=value
             if(line.matches("^.*JENKINS_EXPORT.*$")) {
                 // The value might have some ansi color on it so we need to force the removal  of it
@@ -785,7 +777,13 @@ public class TowerConnector {
                 entities[1] = entities[1].replaceAll("\"$", "");
                 jenkinsExports.put( entities[0], entities[1]);
             }
+            if(removeColor) {
+                // This regex was found on https://stackoverflow.com/questions/14652538/remove-ascii-color-codes
+                line = removeColor(line);
+            }
+            return_lines.add(line);
         }
+        return return_lines;
     }
 
     private String removeColor(String coloredLine) {
@@ -793,7 +791,8 @@ public class TowerConnector {
     }
 
 
-    private void logInventorySync(int syncID) throws AnsibleTowerException {
+    private Vector<String> logInventorySync(int syncID) throws AnsibleTowerException {
+        Vector<String> events = new Vector<String>();
         // These are not normal logs, so we don't need to paginate
         String apiURL = "/inventory_updates/"+ syncID +"/";
         HttpResponse response = makeRequest(GET, apiURL);
@@ -810,15 +809,17 @@ public class TowerConnector {
             logger.logMessage(json);
 
             if(responseObject.containsKey("result_stdout")) {
-                logLine(responseObject.getString("result_stdout"));
+                events.addAll(logLine(responseObject.getString("result_stdout")));
             }
         } else {
             throw new AnsibleTowerException("Unexpected error code returned ("+ response.getStatusLine().getStatusCode() +")");
         }
+        return events;
     }
 
 
-    private void logProjectSync(int syncID) throws AnsibleTowerException {
+    private Vector<String> logProjectSync(int syncID) throws AnsibleTowerException {
+        Vector<String> events = new Vector<String>();
         // These are not normal logs, so we don't need to paginate
         String apiURL = "/project_updates/"+ syncID +"/";
         HttpResponse response = makeRequest(GET, apiURL);
@@ -835,14 +836,16 @@ public class TowerConnector {
             logger.logMessage(json);
 
             if(responseObject.containsKey("result_stdout")) {
-                logLine(responseObject.getString("result_stdout"));
+                events.addAll(logLine(responseObject.getString("result_stdout")));
             }
         } else {
             throw new AnsibleTowerException("Unexpected error code returned ("+ response.getStatusLine().getStatusCode() +")");
         }
+        return events;
     }
 
-    private void logJobEvents(int jobID) throws AnsibleTowerException {
+    private Vector<String> logJobEvents(int jobID) throws AnsibleTowerException {
+        Vector<String> events = new Vector<String>();
         if(!this.logIdForJobs.containsKey(jobID)) { this.logIdForJobs.put(jobID, 0); }
         boolean keepChecking = true;
         while(keepChecking) {
@@ -868,7 +871,7 @@ public class TowerConnector {
                     for (Object anEvent : responseObject.getJSONArray("results")) {
                         Integer eventId = ((JSONObject) anEvent).getInt("id");
                         String stdOut = ((JSONObject) anEvent).getString("stdout");
-                        logLine(stdOut);
+                        events.addAll(logLine(stdOut));
                         if (eventId > this.logIdForJobs.get(jobID)) {
                             this.logIdForJobs.put(jobID, eventId);
                         }
@@ -878,6 +881,7 @@ public class TowerConnector {
                 throw new AnsibleTowerException("Unexpected error code returned (" + response.getStatusLine().getStatusCode() + ")");
             }
         }
+        return events;
     }
 
     public boolean isJobFailed(int jobID, String templateType) throws AnsibleTowerException {

@@ -2,7 +2,9 @@ package org.jenkinsci.plugins.ansible_tower.util;
 
 import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerException;
 
-public class TowerVersion {
+import java.io.Serializable;
+
+public class TowerVersion implements Serializable {
     private int major = 0;
     private int minor = 0;
     private int point = 0;

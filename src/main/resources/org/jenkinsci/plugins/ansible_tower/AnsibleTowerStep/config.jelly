@@ -45,4 +45,7 @@
     <f:entry field="throwExceptionWhenFail" title="Throw exception on failure" help="/plugin/ansible-tower/help-throwExceptionWhenFail.html">
         <f:checkbox />
     </f:entry>
+    <f:entry field="async" title="Run Async" help="/plugin/ansible-tower/help-async.html">
+        <f:checkbox />
+    </f:entry>
 </j:jelly>

@@ -5,7 +5,9 @@ package org.jenkinsci.plugins.ansible_tower.util;
     flow through here.
  */
 
-public class TowerLogger {
+import java.io.Serializable;
+
+public class TowerLogger implements Serializable {
     private boolean debugging = false;
     public void setDebugging(boolean debugging) { this.debugging = debugging; }
     public void logMessage(String message) {
