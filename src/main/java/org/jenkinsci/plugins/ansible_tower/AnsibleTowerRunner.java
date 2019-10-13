@@ -21,6 +21,8 @@ import java.io.PrintStream;
 import java.util.*;
 
 public class AnsibleTowerRunner {
+    private TowerJob myJob = null;
+
     public boolean runJobTemplate(
             PrintStream logger, String towerServer, String jobTemplate, String jobType, String extraVars, String limit,
             String jobTags, String skipJobTags, String inventory, String credential, boolean verbose,
@@ -50,9 +52,9 @@ public class AnsibleTowerRunner {
         }
 
         TowerConnector myTowerConnection = towerConfigToRunOn.getTowerConnector();
-        TowerJob myJob = new TowerJob(myTowerConnection);
+        this.myJob = new TowerJob(myTowerConnection);
         try {
-            myJob.setTemplateType(templateType);
+            this.myJob.setTemplateType(templateType);
         } catch(AnsibleTowerException e) {
             logger.println("ERROR: "+ e);
             return false;
@@ -163,39 +165,42 @@ public class AnsibleTowerRunner {
         //    "ask_job_type_on_launch": false,
         //    "ask_verbosity_on_launch": false,
 
+        myTowerConnection.setRemoveColor(removeColor);
+        myTowerConnection.setGetWorkflowChildLogs(importWorkflowChildLogs);
+
 
         if (verbose) {
             logger.println("Requesting tower to run " + templateType + " template " + expandedJobTemplate);
         }
+
         try {
-            myJob.setJobId(myTowerConnection.submitTemplate(template.getInt("id"), expandedExtraVars, expandedLimit, expandedJobTags, expandedSkipJobTags, jobType, expandedInventory, expandedCredential, templateType));
+            this.myJob.setJobId(myTowerConnection.submitTemplate(template.getInt("id"), expandedExtraVars, expandedLimit, expandedJobTags, expandedSkipJobTags, jobType, expandedInventory, expandedCredential, templateType));
         } catch (AnsibleTowerException e) {
             logger.println("ERROR: Unable to request job template invocation " + e.getMessage());
             return false;
         }
 
-        String jobURL = myTowerConnection.getJobURL(myJob.getJobID(), templateType);
+        String jobURL = myTowerConnection.getJobURL(this.myJob.getJobID(), templateType);
         logger.println("Template Job URL: " + jobURL);
 
-        towerResults.put("JOB_ID", Integer.toString(myJob.getJobID()));
+        towerResults.put("JOB_ID", Integer.toString(this.myJob.getJobID()));
         towerResults.put("JOB_URL", jobURL);
 
-
-        myTowerConnection.setRemoveColor(removeColor);
-        myTowerConnection.setGetWorkflowChildLogs(importWorkflowChildLogs);
-
-
         if (async) {
-            towerResults.put("job", myJob);
+            towerResults.put("job", this.myJob);
             return true;
         }
 
         boolean jobCompleted = false;
         while (!jobCompleted) {
+            if(Thread.currentThread().isInterrupted()) {
+                return this.cancelJob(logger);
+            }
+
             // First log any events if the user wants them
-            if(importTowerLogs) {
+            if (importTowerLogs) {
                 try {
-                    for (String event : myJob.getLogs()) {
+                    for (String event : this.myJob.getLogs()) {
                         logger.println(event);
                     }
                 } catch (AnsibleTowerException e) {
@@ -204,17 +209,20 @@ public class AnsibleTowerRunner {
                 }
             }
             try {
-                jobCompleted = myJob.isComplete();
+                jobCompleted = this.myJob.isComplete();
             } catch (AnsibleTowerException e) {
                 logger.println("ERROR: Failed to get job status from Tower: " + e.getMessage());
                 return false;
             }
             if (!jobCompleted) {
-                try {
-                    Thread.sleep(3000);
-                } catch (InterruptedException ie) {
-                    logger.println("ERROR: Got interrupted while sleeping");
-                    return false;
+                if(Thread.currentThread().isInterrupted()) {
+                    return this.cancelJob(logger);
+                } else {
+                    try {
+                        Thread.sleep(3000);
+                    } catch (InterruptedException ie) {
+                        return this.cancelJob(logger);
+                    }
                 }
             }
         }
@@ -223,7 +231,7 @@ public class AnsibleTowerRunner {
         //    logs within Jenkins.
         if(importTowerLogs) {
             try {
-                for (String event : myJob.getLogs()) {
+                for (String event : this.myJob.getLogs()) {
                     logger.println(event);
                 }
             } catch (AnsibleTowerException e) {
@@ -234,7 +242,7 @@ public class AnsibleTowerRunner {
 
         boolean wasSuccessful;
         try {
-            wasSuccessful = myJob.wasSuccessful();
+            wasSuccessful = this.myJob.wasSuccessful();
         } catch(AnsibleTowerException e) {
             logger.println("ERROR: Failed to get job compltion status: "+ e.getMessage());
             return false;
@@ -242,7 +250,7 @@ public class AnsibleTowerRunner {
 
         HashMap<String, String> jenkinsVariables;
         try {
-            jenkinsVariables = myJob.getExports();
+            jenkinsVariables = this.myJob.getExports();
         } catch(AnsibleTowerException e) {
             logger.println("Failed to get exported variables: "+ e);
             return false;
@@ -284,4 +292,14 @@ public class AnsibleTowerRunner {
         return wasSuccessful;
     }
 
+    public boolean cancelJob(PrintStream logger) {
+        logger.println("Attempting to cancel launched Tower job");
+        try {
+            this.myJob.cancelJob();
+            logger.println("Job successfully canceled in Tower");
+        } catch(AnsibleTowerException ae) {
+            logger.println("Failed to cancel tower job: "+ ae);
+        }
+        return false;
+    }
 }

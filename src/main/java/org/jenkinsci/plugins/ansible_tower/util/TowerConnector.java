@@ -668,6 +668,68 @@ public class TowerConnector implements Serializable {
         }
     }
 
+    public void cancelJob(int jobID, String templateType) throws AnsibleTowerException {
+        checkTemplateType(templateType);
+
+        String apiEndpoint = "/jobs/"+ jobID +"/";
+        if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)) { apiEndpoint = "/workflow_jobs/"+ jobID +"/"; }
+        apiEndpoint = apiEndpoint + "cancel/";
+        HttpResponse response = makeRequest(GET, apiEndpoint);
+
+        if(response.getStatusLine().getStatusCode() != 200) {
+            throw new AnsibleTowerException("Unexpected error code returned (" + response.getStatusLine().getStatusCode() + ")");
+        }
+
+        JSONObject responseObject;
+        String json;
+        try {
+            json = EntityUtils.toString(response.getEntity());
+            responseObject = JSONObject.fromObject(json);
+        } catch(IOException ioe) {
+            throw new AnsibleTowerException("Unable to read response and convert it into json: "+ ioe.getMessage());
+        }
+
+        if(responseObject.containsKey("can_cancel")) {
+            boolean canCancel = responseObject.getBoolean("can_cancel");
+            // If we can't cancel this job raise an error
+            if(!canCancel) { throw new AnsibleTowerException("The job can not be canceled at this time"); }
+        }
+
+        // Reuqest for Tower to cancel the job
+        response = makeRequest(POST, apiEndpoint);
+        if(response.getStatusLine().getStatusCode() != 202) {
+            throw new AnsibleTowerException("Unexpected error code returned (" + response.getStatusLine().getStatusCode());
+        }
+
+        // We will now try for up to 10 seconds to cancel the job.
+        int counter = 10;
+        while(counter > 0) {
+            response = makeRequest(GET, apiEndpoint);
+            if(response.getStatusLine().getStatusCode() != 200) {
+                throw new AnsibleTowerException("Unexpected error code returned (" + response.getStatusLine().getStatusCode() + ")");
+            }
+            try {
+                json = EntityUtils.toString(response.getEntity());
+                responseObject = JSONObject.fromObject(json);
+            } catch(IOException ioe) {
+                throw new AnsibleTowerException("Unable to read response and convert it into json: "+ ioe.getMessage());
+            }
+
+            if (responseObject.containsKey("can_cancel")) {
+                boolean canCancel = responseObject.getBoolean("can_cancel");
+                if(!canCancel) { return; }
+            }
+            counter--;
+            try {
+                Thread.sleep(1000);
+            } catch(InterruptedException ie) {
+                throw new AnsibleTowerException("Interrupted while attempting to cancel job");
+            }
+        }
+
+        throw new AnsibleTowerException("Failed to cancel the job within the specified time limit");
+    }
+
     /**
      * @deprecated
      * Use isJobCompleted

@@ -47,4 +47,9 @@ public class TowerJob  implements Serializable {
         if(this.jobId == -1) { throw new AnsibleTowerException("Job ID was not set"); }
         return this.connection.getJenkinsExports();
     }
+
+    public void cancelJob() throws AnsibleTowerException {
+        if(this.jobId == -1) { throw new AnsibleTowerException("Job ID was not set"); }
+        this.connection.cancelJob(this.jobId, this.templateType);
+    }
 }

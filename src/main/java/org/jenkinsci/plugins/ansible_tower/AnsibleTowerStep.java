@@ -216,7 +216,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
 
 
         @Override
-        protected Properties run() throws Exception {
+        protected Properties run() throws AbortException {
             if ((computer == null) || (computer.getNode() == null)) {
                 throw new AbortException("The Ansible Tower build step requires to be launched on a node");
             }
