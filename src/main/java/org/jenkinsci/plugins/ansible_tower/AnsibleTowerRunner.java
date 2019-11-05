@@ -12,9 +12,7 @@ import hudson.model.Run;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
 import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerException;
-import org.jenkinsci.plugins.ansible_tower.util.TowerJob;
-import org.jenkinsci.plugins.ansible_tower.util.TowerConnector;
-import org.jenkinsci.plugins.ansible_tower.util.TowerInstallation;
+import org.jenkinsci.plugins.ansible_tower.util.*;
 import org.jenkinsci.plugins.envinject.service.EnvInjectActionSetter;
 
 import java.io.PrintStream;
@@ -301,5 +299,157 @@ public class AnsibleTowerRunner {
             logger.println("Failed to cancel tower job: "+ ae);
         }
         return false;
+    }
+
+    public boolean cancelProjectSync(PrintStream logger, TowerProjectSync projectSync) {
+        logger.println("Attempting to cancel project sync");
+        try {
+            projectSync.cancelSync();
+            logger.println("Project sync successfullt canceled in Tower");
+        } catch(AnsibleTowerException ae) {
+            logger.println("Failed to cancel tower project sync: "+ ae);
+        }
+        return false;
+    }
+
+    public boolean projectSync(PrintStream logger, String towerServer, String projectName, boolean verbose,
+                               boolean importTowerLogs, boolean removeColor, EnvVars envVars, FilePath ws,
+                               Run<?, ?> run, Properties towerResults, boolean async) {
+
+        if (verbose) {
+            logger.println("Beginning Ansible Tower Project Sync on " + towerServer +" for "+ projectName);
+        }
+
+        // Get our Tower connector
+        AnsibleTowerGlobalConfig myConfig = new AnsibleTowerGlobalConfig();
+        TowerInstallation towerConfigToRunOn = myConfig.getTowerInstallationByName(towerServer);
+        if (towerConfigToRunOn == null) {
+            logger.println("ERROR: Ansible tower server " + towerServer + " does not exist in Ansible Tower configuration");
+            return false;
+        }
+        TowerConnector myTowerConnection = towerConfigToRunOn.getTowerConnector();
+        myTowerConnection.setRemoveColor(removeColor);
+
+        // Expand all of the parameters
+        String expandedProject = envVars.expand(projectName);
+
+        if (verbose) {
+            if (expandedProject != null && !expandedProject.equals(projectName)) {
+                logger.println("Expanded project to " + expandedProject);
+            }
+        }
+
+        // Get the project
+        TowerProject myProject = null;
+        try {
+            myProject = new TowerProject(expandedProject, myTowerConnection);
+        } catch(AnsibleTowerException e) {
+            logger.println("ERROR: Unable to lookup project: " + e.getMessage());
+            return false;
+        }
+
+        // Make sure we can update the project
+        try {
+            if (!myProject.canUpdate()) {
+                logger.println("ERROR: The requested project can not be synced, is it a manual project?");
+                return false;
+            }
+        } catch(AnsibleTowerException e) {
+            logger.println("ERROR: Failed to check if the project can be synced: "+ e.getMessage());
+            return false;
+        }
+
+        if (verbose) {
+            logger.println("Requesting tower to sync " + projectName + " template " + expandedProject);
+        }
+
+        // Request a project sync
+        TowerProjectSync projectSync;
+        try {
+            projectSync = myProject.sync();
+        } catch (AnsibleTowerException e) {
+            logger.println("ERROR: Unable to request project sync invocation " + e.getMessage());
+            return false;
+        }
+
+        String syncURL = projectSync.getURL();
+        logger.println("Project Sync URL: "+ syncURL);
+        towerResults.put("SYNC_ID", projectSync.getID());
+        towerResults.put("SYNC_URL", syncURL);
+
+        // If we are async, we can just return the project sync object
+        if (async) {
+            towerResults.put("sync", projectSync);
+            return true;
+        }
+
+        // Otherwise we can monitor the project sync
+        boolean syncCompleted = false;
+        while (!syncCompleted) {
+            if(Thread.currentThread().isInterrupted()) {
+                return this.cancelProjectSync(logger, projectSync);
+            }
+
+            // First log any events if the user wants them
+            if (importTowerLogs) {
+                try {
+                    for (String event : projectSync.getLogs()) {
+                        logger.println(event);
+                    }
+                } catch (AnsibleTowerException e) {
+                    logger.println("ERROR: Failed to get project sync events from tower: " + e.getMessage());
+                    return false;
+                }
+            }
+            try {
+                syncCompleted = projectSync.isComplete();
+            } catch (AnsibleTowerException e) {
+                logger.println("ERROR: Failed to get project sync status from Tower: " + e.getMessage());
+                return false;
+            }
+            if (!syncCompleted) {
+                if(Thread.currentThread().isInterrupted()) {
+                    return this.cancelProjectSync(logger, projectSync);
+                } else {
+                    try {
+                        Thread.sleep(3000);
+                    } catch (InterruptedException ie) {
+                        return this.cancelProjectSync(logger, projectSync);
+                    }
+                }
+            }
+        }
+        // One final log of events (if we want them)
+        // Note, that a job can complete long before Tower has finished consuming the logs. This can cause incomplete
+        //    logs within Jenkins.
+        if(importTowerLogs) {
+            try {
+                for (String event : projectSync.getLogs()) {
+                    logger.println(event);
+                }
+            } catch (AnsibleTowerException e) {
+                logger.println("ERROR: Failed to get final project sync events from tower: " + e.getMessage());
+                return false;
+            }
+        }
+
+        boolean wasSuccessful;
+        try {
+            wasSuccessful = projectSync.wasSuccessful();
+        } catch(AnsibleTowerException e) {
+            logger.println("ERROR: Failed to get project sync compltion status: "+ e.getMessage());
+            return false;
+        }
+        towerResults.put("SYNC_RESULT", wasSuccessful ? "SUCCESS" : "FAILED");
+
+        // Project sync can not export jenkins variables so we don't need to check for them here
+
+        if(wasSuccessful) {
+            logger.println("Tower completed the requested project sync");
+        } else {
+            logger.println("Tower failed to complete the requested project sync");
+        }
+
+        return wasSuccessful;
     }
 }

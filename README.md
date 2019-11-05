@@ -15,7 +15,7 @@ This plugin connects Jenkins to [Ansible Tower](http://www.ansible.com/) to do t
 
 After installing the plugin you can configure Ansible Tower servers in the Jenkins Global Configuration under the section *Ansible Tower* by clicking the add button.
 
-![Configure Security](/docs/images/configuration-0.7.0.png)
+![Configure Plugin](/docs/images/configuration-0.7.0.png)
 
 The fields are as follows:
 
@@ -29,10 +29,43 @@ The fields are as follows:
 
 Once the settings are completed, you can test the connection between Jenkins and Ansible Tower by clicking on the Test Connection button.
 
-## Adding a Build Step
+## OAuth Authentication
+
+Starting in Tower version 3.3.0, Oauth Authentication can be used alongside basic auth. Beginning in Tower version 3.4.0, **basic authentication will be disabled**.
+
+The [Ansible Tower Documentation](https://docs.ansible.com/ansible-tower/latest/html/userguide/applications_auth.html)
+ covers this in detail, but here is a rough outline of what needs to be performed.
+
+Tower Configuration
+
+1. Add an Application for the Jenkins Oauth tokens
+   * Name (i.e. "Jenkins")
+   * Description (optional)
+   * Organization (The organization which covers the JTs and WFJTs you will be using)
+   * Authorization Grant Type = Resource owner password-based
+   * Client Type = Confidential
+1. Add or create a user to bind to an Oauth token
+   * This should be a service account with limited permissions.
+   * Add a Token for this user with the Users / <Username> / Tokens / Create Token dialogue (with the appropriate scope)
+   * Copy the Token ID which is generated on the prompt.
+
+Jenkins Configuration
+
+1. Install this plugin (it must be a version >= 0.90)
+1. Add a Credential
+   * Choose the appropriate scope
+   * Secret = Token ID from step 2.c above
+   * ID = Something to denote it's purpose (i.e. "jenkins-tower-token")
+   * Description (optional)
+1. Complete the configuration steps as defined in this guide's 'Configuration'
+
+## Job Execution
+
+### Adding a Build Step
+
 In a freestyle project a new build step called Ansible Tower is now available:
 
-![Configure Build Step](/docs/images/image2018-7-15_15_0_9.png)
+![Run Job Build Step](/docs/images/run_job_freestyle.png)
 
 | Field | Description |
 |-------|-------------|
@@ -51,7 +84,7 @@ In a freestyle project a new build step called Ansible Tower is now available:
 | Import Workflow Child Output | Pull in the output from all of the jobs that the template runs.|
 | Remove Color | When importing the Ansible Tower output, strip off the ansi color codings.|
 
-## Pipeline support
+### Pipeline support
 Tower jobs can be executed from workflow scripts.
 The towerServer and jobTemplate are the only required parameters.
 
@@ -77,9 +110,39 @@ my_var:  "Jenkins Test"''',
     }
 }
 ```
+
+## Project Update
+
+### Adding a Build Step
+In a freestyle project a new build called Ansible Tower Project Sync is now available:
+
+![Project Sync Build Step](/docs/images/project_sync_freestyle.png)
+
+| Field | Description |
+|-------|-------------|
+| Tower Server | The predefined Ansible Tower server to run the sync on. |
+| Project Name | The name of the project to perform the SCM sync. |
+| Verbose | Add additional messages to the Jenkins console about the job run.|
+| Import Tower Output | Pull all of the logs from Ansible Tower into the Jenkins console.|
+| Remove Color | When importing the Ansible Tower output, strip off the ansi color codings.|
+
+### Pipeline Support
+Project syncs can be executed from workflow scripts. The ansibleTowerProjectSync function is made available through this plugin. The towerServer and project parameters are the only ones required.
+```groovy
+        projectSyncResults = ansibleTowerProjectSync(
+            async: true,
+            importTowerLogs: true,
+            project: 'Demo Project',
+            removeColor: false,
+            throwExceptionWhenFail: false,
+            towerServer: 'EC2 AWX 8',
+            verbose: false
+        )
+```
+
 ## Async Execution
 
-As of version 0.10.0, pipeline scripts have the async option. This will run the Tower job but immediately return the control of the job back to Jenkins. In the return value from ansibleTower will be an object that can be used later on to interact with the job:
+As of version 0.10.0, pipeline scripts support the async option. This will run the Tower task but immediately return the control of the job back to Jenkins. In the return value from either ansibleTower or ansibleTowerProjectSync will be an object that can be used later on to interact with the job:
 
 ```groovy
 stage('Launch Tower job') {
@@ -165,11 +228,16 @@ stage('Process Tower results') {
 * new java.util.HashMap
 * new java.util.Vector
 
+Using ansibleTowerProjectSync will require similar script apprivals:
+* method org.jenkinsci.plugins.ansible_tower.util.TowerProjectSync getLogs
+* method org.jenkinsci.plugins.ansible_tower.util.TowerProjectSync isComplete
+* method org.jenkinsci.plugins.ansible_tower.util.TowerProjectSync wasSuccessful
+
 Please consider if you want these options added and use at your own risk.
 
 ## Expanding Env Vars
 
-The fields passed to Tower (jobTemplate, extraVars, limit, jobTags, inventory, credential) can have Jenkins Env Vars placed inside of them and expanded. For example, if you had a job parameter as TAG you could expand that in the Extra Vars like this:
+The fields passed to Tower (project, jobTemplate, extraVars, limit, jobTags, inventory, credential) can have Jenkins Env Vars placed inside of them and expanded. For example, if you had a job parameter as TAG you could expand that in the Extra Vars like this:
 ```yaml
 ---
 my_var: "$TAG"
@@ -202,38 +270,8 @@ node {
 If you do not have a plugin like AnsiColor or want to remove the color from the log set removeColor: true.
 
 
-## OAuth Authentication
-
-Starting in Tower version 3.3.0, Oauth Authentication can be used alongside basic auth. Beginning in Tower version 3.4.0, **basic authentication will be disabled**.
-
-The [Ansible Tower Documentation](https://docs.ansible.com/ansible-tower/latest/html/userguide/applications_auth.html)
- covers this in detail, but here is a rough outline of what needs to be performed.
-
-Tower Configuration
-
-1. Add an Application for the Jenkins Oauth tokens
-   * Name (i.e. "Jenkins")
-   * Description (optional)
-   * Organization (The organization which covers the JTs and WFJTs you will be using)
-   * Authorization Grant Type = Resource owner password-based
-   * Client Type = Confidential
-1. Add or create a user to bind to an Oauth token
-   * This should be a service account with limited permissions.
-   * Add a Token for this user with the Users / <Username> / Tokens / Create Token dialogue (with the appropriate scope)
-   * Copy the Token ID which is generated on the prompt.
-
-Jenkins Configuration
-
-1. Install this plugin (it must be a version >= 0.90)
-1. Add a Credential
-   * Choose the appropriate scope
-   * Secret = Token ID from step 2.c above
-   * ID = Something to denote it's purpose (i.e. "jenkins-tower-token")
-   * Description (optional)
-1. Complete the configuration steps as defined in this guide's 'Configuration'
-
 ## Returning Data
-The plugin supports sending data from Tower back to Jenkins for use in your job. There are two method for exporting data: Purpose Driven Logging and Setting Stats
+The plugin supports sending data from Tower back to Jenkins for use in your job. For job runs, there are two methods for exporting data: Purpose Driven Logging and Setting Stats
 
 ### Purpose Driven Logging
 Then, in your Tower job simply include a debugging statement like:
@@ -305,8 +343,13 @@ node {
 }
 ```
 
-There are three special variables in results: 
+For a job run, there are three special variables in results: 
 
 * JOB_ID - a string containing the Tower ID number of the job
 * JOB_URL - a string containing the URL to the job in Tower
 * JOB_RESULT - a String of either SUCCESS or FAILED depending on the job status.<br/>**Note:** This variable is only applied for a non-async job.
+
+For a project sync, there are:
+* SYNC_ID - a string containing the Tower ID number of the project sync
+* SYNC_URL - a string containing the URL to the sync job in Tower
+* SYNC_RESULT = a string of either SUCCESS or FAILED depending on the sync status.<br/>**Note:** This variable is only applied for a non-async job.

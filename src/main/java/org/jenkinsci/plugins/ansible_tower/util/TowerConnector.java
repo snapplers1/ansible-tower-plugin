@@ -43,8 +43,8 @@ import org.apache.http.util.EntityUtils;
 import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerItemDoesNotExist;
 
 public class TowerConnector implements Serializable {
-    private static final int GET = 1;
-    private static final int POST = 2;
+    public static final int GET = 1;
+    public static final int POST = 2;
     public static final String JOB_TEMPLATE_TYPE = "job";
     public static final String WORKFLOW_TEMPLATE_TYPE = "workflow";
     private static final String ARTIFACTS = "artifacts";
@@ -133,6 +133,8 @@ public class TowerConnector implements Serializable {
     }
 
     private String buildEndpoint(String endpoint) {
+        if(endpoint.startsWith("/api/")) { return endpoint; }
+
         String full_endpoint = "/api/"+ API_VERSION;
         if(!endpoint.startsWith("/")) { full_endpoint += "/"; }
         full_endpoint += endpoint;
@@ -147,7 +149,7 @@ public class TowerConnector implements Serializable {
         return makeRequest(requestType, endpoint, body, false);
     }
 
-    private HttpResponse makeRequest(int requestType, String endpoint, JSONObject body, boolean noAuth) throws AnsibleTowerException, AnsibleTowerItemDoesNotExist {
+    public HttpResponse makeRequest(int requestType, String endpoint, JSONObject body, boolean noAuth) throws AnsibleTowerException, AnsibleTowerItemDoesNotExist {
         // Parse the URL
         URI myURI;
         try {
@@ -297,6 +299,7 @@ public class TowerConnector implements Serializable {
         }
     }
 
+    public String getURL() { return url; }
     public void getVersion() throws AnsibleTowerException {
         // The version is housed on the poing page which is openly accessable
         HttpResponse response = makeRequest(GET, "ping/", null, true);
@@ -827,7 +830,7 @@ public class TowerConnector implements Serializable {
         return events;
     }
 
-    private Vector<String> logLine(String output) throws AnsibleTowerException {
+    public Vector<String> logLine(String output) throws AnsibleTowerException {
         Vector<String> return_lines = new Vector<String>();
         String[] lines = output.split("\\r\\n");
         for(String line : lines) {
