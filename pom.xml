@@ -16,7 +16,7 @@
     <description>
         This plugin allows Jenkins to run a job template in Ansible Tower.
     </description>
-    <url>http://wiki.jenkins-ci.org/display/JENKINS/Ansible+Tower+Plugin</url>
+    <url>https://github.com/jenkinsci/ansible-tower-plugin</url>
     <licenses>
         <license>
             <name>MIT license</name>
