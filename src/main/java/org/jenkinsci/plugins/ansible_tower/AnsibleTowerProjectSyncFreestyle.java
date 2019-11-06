@@ -102,6 +102,8 @@ public class AnsibleTowerProjectSyncFreestyle extends Builder {
 		public static final Boolean importTowerLogs			= false;
 		public static final Boolean removeColor				= false;
 		public static final String templateType				= "job";
+		public static final Boolean throwExceptionWhenFail  = true;
+		public static final boolean async                   = false;
 
         public DescriptorImpl() {
             load();

@@ -77,13 +77,13 @@ public class AnsibleTowerProjectSyncStep extends AbstractStepImpl {
 
     @Extension(optional = true)
     public static final class DescriptorImpl extends AbstractStepDescriptorImpl {
-        public static final String towerServer              = AnsibleTowerProjectSyncStep.DescriptorImpl.towerServer;
-        public static final String project                  = AnsibleTowerProjectSyncStep.DescriptorImpl.project;
-        public static final Boolean verbose                 = AnsibleTowerProjectSyncStep.DescriptorImpl.verbose;
-        public static final Boolean importTowerLogs         = AnsibleTowerProjectSyncStep.DescriptorImpl.importTowerLogs;
-        public static final Boolean removeColor             = AnsibleTowerProjectSyncStep.DescriptorImpl.removeColor;
-        public static final Boolean throwExceptionWhenFail  = AnsibleTowerProjectSyncStep.DescriptorImpl.throwExceptionWhenFail;
-        public static final Boolean async                   = AnsibleTowerProjectSyncStep.DescriptorImpl.async;
+        public static final String towerServer              = AnsibleTowerProjectSyncFreestyle.DescriptorImpl.towerServer;
+        public static final String project                  = AnsibleTowerProjectSyncFreestyle.DescriptorImpl.project;
+        public static final Boolean verbose                 = AnsibleTowerProjectSyncFreestyle.DescriptorImpl.verbose;
+        public static final Boolean importTowerLogs         = AnsibleTowerProjectSyncFreestyle.DescriptorImpl.importTowerLogs;
+        public static final Boolean removeColor             = AnsibleTowerProjectSyncFreestyle.DescriptorImpl.removeColor;
+        public static final Boolean throwExceptionWhenFail  = AnsibleTowerProjectSyncFreestyle.DescriptorImpl.throwExceptionWhenFail;
+        public static final Boolean async                   = AnsibleTowerProjectSyncFreestyle.DescriptorImpl.async;
 
         public DescriptorImpl() {
             super(AnsibleTowerProjectSyncStepExecution.class);
