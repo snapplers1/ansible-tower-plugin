@@ -320,9 +320,9 @@ public class AnsibleTowerRunner {
         return false;
     }
 
-    public boolean projectSync(PrintStream logger, String towerServer, String projectName, boolean verbose,
-                               boolean importTowerLogs, boolean removeColor, EnvVars envVars, FilePath ws,
-                               Run<?, ?> run, Properties towerResults, boolean async) {
+    public boolean projectSync(PrintStream logger, String towerServer, String towerCredentialsId, String projectName,
+                               boolean verbose, boolean importTowerLogs, boolean removeColor, EnvVars envVars,
+                               FilePath ws, Run<?, ?> run, Properties towerResults, boolean async) {
 
         if (verbose) {
             logger.println("Beginning Ansible Tower Project Sync on " + towerServer +" for "+ projectName);
@@ -335,7 +335,14 @@ public class AnsibleTowerRunner {
             logger.println("ERROR: Ansible tower server " + towerServer + " does not exist in Ansible Tower configuration");
             return false;
         }
+
+        // Apply credential override if provided
+        if(towerCredentialsId != null && !towerCredentialsId.equals("")) {
+            towerConfigToRunOn.setTowerCredentialsId(towerCredentialsId);
+        }
+
         TowerConnector myTowerConnection = towerConfigToRunOn.getTowerConnector();
+
         myTowerConnection.setRemoveColor(removeColor);
 
         // Expand all of the parameters

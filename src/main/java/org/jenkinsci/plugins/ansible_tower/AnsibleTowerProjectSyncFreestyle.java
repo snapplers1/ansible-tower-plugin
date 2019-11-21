@@ -5,23 +5,29 @@ package org.jenkinsci.plugins.ansible_tower;
         We simply take the data from Jenkins and call an AnsibleTowerRunner
  */
 
+import com.cloudbees.plugins.credentials.CredentialsProvider;
+import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
+import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
+import com.cloudbees.plugins.credentials.common.UsernamePasswordCredentials;
 import hudson.EnvVars;
 import hudson.Extension;
 import hudson.Launcher;
-import hudson.model.AbstractBuild;
-import hudson.model.AbstractProject;
-import hudson.model.BuildListener;
-import hudson.model.Result;
+import hudson.model.*;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.ListBoxModel;
 import org.jenkinsci.plugins.ansible_tower.util.TowerInstallation;
+import org.jenkinsci.plugins.plaincredentials.StringCredentials;
+import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
+import org.kohsuke.stapler.verb.POST;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.util.Properties;
+
+import static com.cloudbees.plugins.credentials.CredentialsMatchers.instanceOf;
 
 /**
  * @author Janario Oliveira
@@ -29,6 +35,7 @@ import java.util.Properties;
 public class AnsibleTowerProjectSyncFreestyle extends Builder {
 
 	private @Nonnull String towerServer     = DescriptorImpl.towerServer;
+	private String towerCredentialsId       = "";
 	private @Nonnull String project         = DescriptorImpl.project;
     private Boolean verbose                 = DescriptorImpl.verbose;
     private Boolean importTowerLogs			= DescriptorImpl.importTowerLogs;
@@ -36,10 +43,11 @@ public class AnsibleTowerProjectSyncFreestyle extends Builder {
 
 	@DataBoundConstructor
 	public AnsibleTowerProjectSyncFreestyle(
-			@Nonnull String towerServer, @Nonnull String project, Boolean verbose,
+			@Nonnull String towerServer, String towerCredentialsId, @Nonnull String project, Boolean verbose,
 			Boolean importTowerLogs, Boolean removeColor
 	) {
 		this.towerServer = towerServer;
+		this.towerCredentialsId = towerCredentialsId;
 		this.project = project;
 		this.verbose = verbose;
 		this.importTowerLogs = importTowerLogs;
@@ -48,6 +56,7 @@ public class AnsibleTowerProjectSyncFreestyle extends Builder {
 
 	@Nonnull
 	public String getTowerServer() { return towerServer; }
+	public String getTowerCredentialsId() { return towerCredentialsId; }
 	@Nonnull
 	public String getProject() { return project; }
 	public Boolean getVerbose() { return verbose; }
@@ -56,6 +65,8 @@ public class AnsibleTowerProjectSyncFreestyle extends Builder {
 
 	@DataBoundSetter
 	public void setTowerServer(String towerServer) { this.towerServer = towerServer; }
+	@DataBoundSetter
+	public void setTowerCredentialsId(String towerCredentialsId) { this.towerCredentialsId = towerCredentialsId; }
 	@DataBoundSetter
 	public void setProject(String project) { this.project = project; }
 	@DataBoundSetter
@@ -81,7 +92,7 @@ public class AnsibleTowerProjectSyncFreestyle extends Builder {
 
 		// here we just pass a map as we don't case for non pipeline jobs
 		boolean runResult = runner.projectSync(
-				listener.getLogger(), this.getTowerServer(), this.project,
+				listener.getLogger(), this.getTowerServer(), this.getTowerCredentialsId(), this.project,
 				this.verbose, this.importTowerLogs, this.getRemoveColor(), envVars,
 				build.getWorkspace(), build, new Properties(), false
 		);
@@ -97,6 +108,7 @@ public class AnsibleTowerProjectSyncFreestyle extends Builder {
 	@Extension(optional = true)
     public static final class DescriptorImpl extends BuildStepDescriptor<Builder> {
         public static final String towerServer    			= "";
+		public static final String towerCredentialsId    	= "";
         public static final String project       			= "";
 		public static final Boolean verbose       			= false;
 		public static final Boolean importTowerLogs			= false;
@@ -126,5 +138,19 @@ public class AnsibleTowerProjectSyncFreestyle extends Builder {
 			}
 			return items;
         }
+
+		// This requires a POST method to protect from CSFR
+		@POST
+		public ListBoxModel doFillTowerCredentialsIdItems(@AncestorInPath Project project) {
+			// Also, validate that we are an Administrator
+			//Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
+			return new StandardListBoxModel().withEmptySelection().withMatching(
+					instanceOf(UsernamePasswordCredentials.class),
+					CredentialsProvider.lookupCredentials(StandardUsernameCredentials.class, project)
+			).withMatching(
+					instanceOf(StringCredentials.class),
+					CredentialsProvider.lookupCredentials(StringCredentials.class, project)
+			);
+		}
     }
 }
