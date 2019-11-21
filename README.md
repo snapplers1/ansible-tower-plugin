@@ -70,7 +70,7 @@ In a freestyle project a new build step called Ansible Tower is now available:
 | Field | Description |
 |-------|-------------|
 | Tower Server | The predefined Ansible Tower server to run the template on.|
-| Tower Credentials ID | Allows to overwrite the credentials from global Ansible Tower configuration|
+| Tower Credentials Override | Overrides the credentials from global Ansible Tower configuration.|
 | Template Type | Whether you are running a job or workflow template.|
 | Template ID | The name or numerical ID of the template to be run on the Ansible Tower server.|
 | Extra Vars | Additional variables to be passed to the job. I.e.:<br/>---<br/>my_var: This is a variable called my_var|
@@ -123,6 +123,7 @@ In a freestyle project a new build called Ansible Tower Project Sync is now avai
 | Field | Description |
 |-------|-------------|
 | Tower Server | The predefined Ansible Tower server to run the sync on. |
+| Tower Credentials Override | Overrides the credentials from global Ansible Tower configuration. |
 | Project Name | The name of the project to perform the SCM sync. |
 | Verbose | Add additional messages to the Jenkins console about the job run.|
 | Import Tower Output | Pull all of the logs from Ansible Tower into the Jenkins console.|
