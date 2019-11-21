@@ -1,0 +1,13 @@
+---
+- name: Export variables for Jenkins
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Inject variables in jenkins job/pipeline
+      set_stats:
+        data:
+          JENKINS_EXPORT:
+            - value: "T-REX"
+        aggregate: yes
+        per_host: no

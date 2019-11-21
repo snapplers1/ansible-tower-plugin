@@ -96,7 +96,7 @@
     "credential_type": "Machine",
     "inputs": {
       "username": "root",
-      "password": ""
+      "password": "password"
     },
     "asset_relation": {
       "roles": [
@@ -126,7 +126,7 @@
     "organization": "Jenkins",
     "credential_type": "Vault",
     "inputs": {
-      "vault_password": ""
+      "vault_password": "password"
     },
     "asset_relation": {
       "roles": [

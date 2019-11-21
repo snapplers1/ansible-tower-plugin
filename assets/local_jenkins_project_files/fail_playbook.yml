@@ -1,0 +1,7 @@
+---
+- name: A Playbook That Fails
+  gather_facts: False
+  hosts: localhost
+  connection: local
+  tasks:
+    - debug: msg="Fail {{ non-existant }}"

@@ -1,0 +1,13 @@
+---
+- name: A very simple playbook
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    my_var: "default value"
+
+  tasks:
+    - debug: msg="Test playbook {{ my_var }}"
+
+    - name: Sleeping for 6
+      command: sleep 6

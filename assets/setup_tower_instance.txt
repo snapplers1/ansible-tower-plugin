@@ -1,0 +1,6 @@
+To setup a tower instance for testing:
+
+Install Tower
+Create /var/lib/awx/projects/jenkins_project
+scp -rp local_jenkins_project_files/* <user>@<tower_server>:/var/lib/awx/projects/jenkins_project
+tower-cli send --tower-host <tower_user> --tower-username <user> --tower-password ASK tower_assets.json

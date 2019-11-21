@@ -1,0 +1,241 @@
+---
+- name: A very simple playbook
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    my_var: "default value"
+
+  tasks:
+    - debug: msg="Test playbook {{ my_var }}"
+      tags:
+        - debug_1
+
+    - debug: msg="Second test message"
+      tags:
+        - debug_2
+
+    #- name: Sleeping for 6
+    #  command: sleep 6
+    #  tags:
+    #    - sleep
+
+    - name: Set jenkins variable
+      debug:
+        msg: "JENKINS_EXPORT VAR1=test1"
+
+    - name: Set jenkins variable
+      debug:
+        msg: "JENKINS_EXPORT my_var_2=another variable"
+
+    - name: Set a jenkins variable for with stat
+      set_stats:
+        data:
+          JENKINS_EXPORT:
+            - my_stat_data_1: a
+            - my_stat : 12
+        aggregate: yes
+        per_host: no
+
+    - debug: msg="1"
+
+    - debug: msg="2"
+
+    - debug: msg="3"
+
+    - debug: msg="4"
+
+    - debug: msg="5"
+
+    - debug: msg="6"
+
+    - debug: msg="7"
+
+    - debug: msg="8"
+
+    - debug: msg="9"
+
+    - debug: msg="10"
+
+    - debug: msg="11"
+
+    - debug: msg="12"
+
+    - debug: msg="13"
+
+    - debug: msg="14"
+
+    - debug: msg="15"
+
+    - debug: msg="16"
+
+    - debug: msg="17"
+
+    - debug: msg="18"
+
+    - debug: msg="19"
+
+    - debug: msg="20"
+
+    - debug: msg="21"
+
+    - debug: msg="22"
+
+    - debug: msg="23"
+
+    - debug: msg="24"
+
+    - debug: msg="25"
+
+    - debug: msg="26"
+
+    - debug: msg="27"
+
+    - debug: msg="28"
+
+    - debug: msg="29"
+
+    - debug: msg="30"
+
+    - debug: msg="31"
+
+    - debug: msg="32"
+
+    - debug: msg="33"
+
+    - debug: msg="34"
+
+    - debug: msg="35"
+
+    - debug: msg="36"
+
+    - debug: msg="37"
+
+    - debug: msg="38"
+
+    - debug: msg="39"
+
+    - debug: msg="40"
+
+    - debug: msg="41"
+
+    - debug: msg="42"
+
+    - debug: msg="43"
+
+    - debug: msg="44"
+
+    - debug: msg="45"
+
+    - debug: msg="46"
+
+    - debug: msg="47"
+
+    - debug: msg="48"
+
+    - debug: msg="49"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+
+    - debug: msg="1"
+

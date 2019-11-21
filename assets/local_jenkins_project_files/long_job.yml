@@ -1,0 +1,9 @@
+---
+- name: Run for a long time
+  hosts: localhost
+  connection: local
+  gather_facts: False
+  tasks:
+    - name: Sleep for 10 minutes
+      pause:
+        minutes: 10
