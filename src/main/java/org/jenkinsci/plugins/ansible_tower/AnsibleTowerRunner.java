@@ -22,20 +22,20 @@ public class AnsibleTowerRunner {
     private TowerJob myJob = null;
 
     public boolean runJobTemplate(
-            PrintStream logger, String towerServer, String jobTemplate, String jobType, String extraVars, String limit,
-            String jobTags, String skipJobTags, String inventory, String credential, boolean verbose,
-            boolean importTowerLogs, boolean removeColor, EnvVars envVars, String templateType,
+            PrintStream logger, String towerServer, String towerCredentialsId, String jobTemplate, String jobType,
+            String extraVars, String limit, String jobTags, String skipJobTags, String inventory, String credential,
+            boolean verbose, boolean importTowerLogs, boolean removeColor, EnvVars envVars, String templateType,
             boolean importWorkflowChildLogs, FilePath ws, Run<?, ?> run, Properties towerResults
     ) {
-        return this.runJobTemplate(logger, towerServer, jobTemplate, jobType, extraVars, limit, jobTags, skipJobTags, inventory,
-                credential, verbose, importTowerLogs, removeColor, envVars, templateType, importWorkflowChildLogs, ws,
-                run, towerResults, false);
+        return this.runJobTemplate(logger, towerServer, towerCredentialsId, jobTemplate, jobType, extraVars, limit,
+                jobTags, skipJobTags, inventory, credential, verbose, importTowerLogs, removeColor, envVars,
+                templateType, importWorkflowChildLogs, ws, run, towerResults, false);
     }
 
     public boolean runJobTemplate(
-            PrintStream logger, String towerServer, String jobTemplate, String jobType, String extraVars, String limit,
-            String jobTags, String skipJobTags, String inventory, String credential, boolean verbose,
-            boolean importTowerLogs, boolean removeColor, EnvVars envVars, String templateType,
+            PrintStream logger, String towerServer, String towerCredentialsId, String jobTemplate, String jobType,
+            String extraVars, String limit, String jobTags, String skipJobTags, String inventory, String credential,
+            boolean verbose, boolean importTowerLogs, boolean removeColor, EnvVars envVars, String templateType,
             boolean importWorkflowChildLogs, FilePath ws, Run<?, ?> run, Properties towerResults, boolean async
     ) {
         if (verbose) {
@@ -47,6 +47,14 @@ public class AnsibleTowerRunner {
         if (towerConfigToRunOn == null) {
             logger.println("ERROR: Ansible tower server " + towerServer + " does not exist in Ansible Tower configuration");
             return false;
+        }
+
+        if(towerCredentialsId != null && !towerCredentialsId.equals("")) {
+            towerConfigToRunOn.setTowerCredentialsId(towerCredentialsId);
+        }
+
+        if(run != null) {
+            towerConfigToRunOn.setRun(run);
         }
 
         TowerConnector myTowerConnection = towerConfigToRunOn.getTowerConnector();
