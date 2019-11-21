@@ -5,10 +5,6 @@ package org.jenkinsci.plugins.ansible_tower;
         We simply take the data from Jenkins and call an AnsibleTowerRunner
  */
 
-import com.cloudbees.plugins.credentials.CredentialsProvider;
-import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
-import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
-import com.cloudbees.plugins.credentials.common.UsernamePasswordCredentials;
 import hudson.EnvVars;
 import hudson.Extension;
 import hudson.Launcher;
@@ -16,17 +12,16 @@ import hudson.model.*;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.ListBoxModel;
-import jenkins.model.Jenkins;
+import org.jenkinsci.plugins.ansible_tower.util.GetUserPageCredentials;
 import org.jenkinsci.plugins.ansible_tower.util.TowerInstallation;
-import org.jenkinsci.plugins.plaincredentials.StringCredentials;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
+import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.verb.POST;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Properties;
 
 import static com.cloudbees.plugins.credentials.CredentialsMatchers.instanceOf;
@@ -213,21 +208,13 @@ public class AnsibleTower extends Builder {
 			return items;
         }
 
-		// This requires a POST method to protect from CSFR
 		@POST
-		public ListBoxModel doFillTowerCredentialsIdItems(@AncestorInPath Project project) {
-			// Also, validate that we are an Administrator
-			//Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
-			return new StandardListBoxModel().withEmptySelection().withMatching(
-					instanceOf(UsernamePasswordCredentials.class),
-					CredentialsProvider.lookupCredentials(StandardUsernameCredentials.class, project)
-			).withMatching(
-					instanceOf(StringCredentials.class),
-					CredentialsProvider.lookupCredentials(StringCredentials.class, project)
-			);
+		public ListBoxModel doFillTowerCredentialsIdItems(@AncestorInPath Item item, @QueryParameter String credentialsId) {
+            return GetUserPageCredentials.getUserAvailableCredentials(item, credentialsId);
 		}
 
-        // Some day I'd like to be able to make all of these dropdowns from querying the tower API
+
+		// Some day I'd like to be able to make all of these dropdowns from querying the tower API
 		// Maybe not in real time because that would be slow when loading a the configure job
         /*
         public ListBoxModel doFillPlaybookItems() {

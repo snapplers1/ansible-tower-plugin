@@ -4,7 +4,7 @@
         <f:select />
     </f:entry>
     <f:entry field="towerCredentialsId" title="Tower Credentials Override" help="/plugin/ansible-tower/help-towerCredentials.html">
-        <c:select />
+        <c:select includeUser="true"/>
     </f:entry>
     <f:entry field="templateType" title="Template Type" help="/plugin/ansible-tower/help-templateType.html">
         <f:select/>
