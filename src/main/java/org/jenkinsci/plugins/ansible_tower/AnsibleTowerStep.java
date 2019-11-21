@@ -5,23 +5,33 @@ package org.jenkinsci.plugins.ansible_tower;
     We simply take the data from Jenkins and call an AnsibleTowerRunner
  */
 
+import com.cloudbees.plugins.credentials.CredentialsProvider;
+import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
+import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
+import com.cloudbees.plugins.credentials.common.UsernamePasswordCredentials;
 import com.google.inject.Inject;
 import hudson.Launcher;
 import hudson.model.Computer;
+import hudson.model.Project;
 import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.*;
 import hudson.util.ListBoxModel;
 import org.jenkinsci.plugins.ansible_tower.util.TowerInstallation;
+import org.jenkinsci.plugins.plaincredentials.StringCredentials;
 import org.jenkinsci.plugins.workflow.steps.AbstractStepImpl;
 import org.jenkinsci.plugins.workflow.steps.AbstractSynchronousNonBlockingStepExecution;
 import org.jenkinsci.plugins.workflow.steps.StepContextParameter;
 import org.jenkinsci.plugins.workflow.steps.AbstractStepDescriptorImpl;
+import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
+import org.kohsuke.stapler.verb.POST;
 
 import javax.annotation.Nonnull;
 import java.util.Properties;
+
+import static com.cloudbees.plugins.credentials.CredentialsMatchers.instanceOf;
 
 public class AnsibleTowerStep extends AbstractStepImpl {
     private String towerServer              = "";
@@ -187,6 +197,20 @@ public class AnsibleTowerStep extends AbstractStepImpl {
         public boolean isGlobalColorAllowed() {
             System.out.println("Using the descriptor is global color allowed");
             return true;
+        }
+
+        // This requires a POST method to protect from CSFR
+        @POST
+        public ListBoxModel doFillTowerCredentialsIdItems(@AncestorInPath Project project) {
+            // Also, validate that we are an Administrator
+            //Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
+            return new StandardListBoxModel().withEmptySelection().withMatching(
+                    instanceOf(UsernamePasswordCredentials.class),
+                    CredentialsProvider.lookupCredentials(StandardUsernameCredentials.class, project)
+            ).withMatching(
+                    instanceOf(StringCredentials.class),
+                    CredentialsProvider.lookupCredentials(StringCredentials.class, project)
+            );
         }
     }
 
