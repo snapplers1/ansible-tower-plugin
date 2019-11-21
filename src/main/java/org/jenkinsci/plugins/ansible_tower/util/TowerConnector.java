@@ -7,7 +7,8 @@ package org.jenkinsci.plugins.ansible_tower.util;
 import com.google.common.net.HttpHeaders;
 import net.sf.json.JSONArray;
 import org.apache.http.Header;
-import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerDoesNotSupportAuthtoken;
+import org.apache.http.client.methods.*;
+import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerDoesNotSupportAuthToken;
 import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerException;
 
 import java.io.*;
@@ -23,10 +24,6 @@ import org.apache.commons.codec.binary.Base64;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpVersion;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpHead;
-import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.conn.scheme.Scheme;
 import org.apache.http.conn.scheme.SchemeRegistry;
@@ -50,8 +47,9 @@ public class TowerConnector implements Serializable {
     private static final String ARTIFACTS = "artifacts";
     private static String API_VERSION = "v2";
 
-    private String authToken = null;
+    private String authorizationHeader = null;
     private String oauthToken = null;
+    private String oAuthTokenID = null;
     private String url = null;
     private String username = null;
     private String password = null;
@@ -182,38 +180,36 @@ public class TowerConnector implements Serializable {
 
         // If we haven't determined auth yet we need to go get it
         if(!noAuth) {
-            if (this.oauthToken == null && this.authToken == null && this.username != null && this.password != null) {
-                // We dont' have a token yet so we need to get one
-                logger.logMessage("Performing initial login");
+            if(this.authorizationHeader == null) {
+                // We dont' have an authorization header yet so we need to construct one
+                logger.logMessage("Determining authorization headers");
 
-                // First try to get an authorization header
-                try {
-                    this.authToken = getAuthToken();
-                    // Now that we have an auth token we need to decide if we are using it via Bearer (oAuth) or legacy token
-                    if(this.towerSupportsOAuth()) {
-                        logger.logMessage("Using an oAuth token for "+ this.username);
-                        this.authToken = "Bearer " + this.authToken;
+                if(this.oauthToken != null) {
+                    // First if we have an oauthToken we can just use it
+                    logger.logMessage("Adding oauth bearer token from Jenkins");
+                    this.authorizationHeader = "Bearer "+ this.oauthToken;
+                } else if(this.username != null && this.password != null) {
+                    // Second, if we have a username and a password we can try to go get a token
+                    if (this.towerSupports("/api/o/")) {
+                        logger.logMessage("Getting an oAuth token for "+ this.username);
+                        this.authorizationHeader = "Bearer " + this.getOAuthToken();
+                    } else if (this.towerSupports("/api/v2/authtoken")) {
+                        logger.logMessage("Getting a legacy token for "+ this.username);
+                        this.authorizationHeader = "Token " + this.getAuthToken();
                     } else {
-                        logger.logMessage("Using a legacy token for "+ this.username);
-                        this.authToken = "Token " + this.authToken;
+                        logger.logMessage("Tower does not support authtoken or oauth, reverting to basic auth");
+                        this.authorizationHeader = this.getBasicAuthString();
                     }
-                } catch (AnsibleTowerDoesNotSupportAuthtoken dneat) {
-                    logger.logMessage("Tower does not support authtoken, reverting to basic auth");
-                    logger.logMessage(dneat.getMessage());
-                    this.authToken = this.getBasicAuthString();
+                } else {
+                    throw new AnsibleTowerException("Auth is required for this call but no auth info exists");
                 }
+
             }
 
-            if (this.oauthToken != null) {
-                // If we were given an oauthToken we will just use that directly
-                logger.logMessage("Adding oauth bearer token from Jenkins");
-                request.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + this.oauthToken);
-            } else if(this.authToken != null) {
-                logger.logMessage("Adding token pulled from Tower");
-                request.setHeader(HttpHeaders.AUTHORIZATION, this.authToken);
-            } else {
-                throw new AnsibleTowerException("Auth is required for this call but no auth info exists");
+            if(this.authorizationHeader == null) {
+                throw new AnsibleTowerException("We should have gotten an authorization header but did not");
             }
+            request.setHeader(HttpHeaders.AUTHORIZATION, this.authorizationHeader);
         }
 
         // Dump the request
@@ -269,32 +265,32 @@ public class TowerConnector implements Serializable {
     }
 
 
-    private boolean towerSupportsOAuth() throws AnsibleTowerException {
+    private boolean towerSupports(String end_point) throws AnsibleTowerException {
         // To determine if we support oAuth we will be making a HEAD call to /api/o to see what happens
 
         URI myURI;
         try {
-            myURI = new URI(url+"/api/o/");
+            myURI = new URI(url+end_point);
         } catch(Exception e) {
-            throw new AnsibleTowerException("URL issue: "+ e.getMessage());
+            throw new AnsibleTowerException("Unable to construct URL for "+ end_point +": "+ e.getMessage());
         }
 
-        logger.logMessage("Checking for oAuth at: "+ myURI.toString());
+        logger.logMessage("Checking if Tower can: "+ myURI.toString());
 
         DefaultHttpClient httpClient = getHttpClient();
         HttpResponse response;
         try {
             response = httpClient.execute(new HttpHead(myURI));
         } catch(Exception e) {
-            throw new AnsibleTowerException("Unable to make Tower HEAD request for oauth: "+ e.getMessage());
+            throw new AnsibleTowerException("Unable to make Tower HEAD request for "+ end_point +": "+ e.getMessage());
         }
 
-        logger.logMessage("oAuth request completed with ("+ response.getStatusLine().getStatusCode() +")");
+        logger.logMessage("Can Tower request completed with ("+ response.getStatusLine().getStatusCode() +")");
         if(response.getStatusLine().getStatusCode() == 404) {
-            logger.logMessage("Tower does not supoort oAuth");
+            logger.logMessage("Tower does not supoort "+ end_point);
             return false;
         } else {
-            logger.logMessage("Tower supoorts oAuth");
+            logger.logMessage("Tower supoorts "+ end_point);
             return true;
         }
     }
@@ -335,6 +331,7 @@ public class TowerConnector implements Serializable {
         if(response.getStatusLine().getStatusCode() != 200) {
             throw new AnsibleTowerException("Failed to get authenticated connection ("+ response.getStatusLine().getStatusCode() +")");
         }
+        releaseToken();
     }
 
     public String convertPotentialStringToID(String idToCheck, String api_endpoint) throws AnsibleTowerException, AnsibleTowerItemDoesNotExist {
@@ -993,6 +990,61 @@ public class TowerConnector implements Serializable {
         return "Basic " + new String(encodedAuth, Charset.forName("UTF-8"));
     }
 
+    private String getOAuthToken() throws AnsibleTowerException {
+        String tokenURI = url + this.buildEndpoint("/tokens/");
+        HttpPost oauthTokenRequest = new HttpPost(tokenURI);
+        oauthTokenRequest.setHeader(HttpHeaders.AUTHORIZATION, this.getBasicAuthString());
+        JSONObject body = new JSONObject();
+        body.put("description", "Jenkins Token");
+        body.put("application", null);
+        body.put("scope", "write");
+        try {
+            StringEntity bodyEntity = new StringEntity(body.toString());
+            oauthTokenRequest.setEntity(bodyEntity);
+        } catch(UnsupportedEncodingException uee) {
+            throw new AnsibleTowerException("Unable to encode body as JSON: "+ uee.getMessage());
+        }
+
+        oauthTokenRequest.setHeader("Content-Type", "application/json");
+
+        DefaultHttpClient httpClient = getHttpClient();
+        HttpResponse response;
+        try {
+            logger.logMessage("Calling for oauth token at "+ tokenURI);
+            response = httpClient.execute(oauthTokenRequest);
+        } catch(Exception e) {
+            throw new AnsibleTowerException("Unable to make request for an oauth token: "+ e.getMessage());
+        }
+
+        if(response.getStatusLine().getStatusCode() == 400) {
+            throw new AnsibleTowerException("Username/password invalid");
+        } else if(response.getStatusLine().getStatusCode() == 404) {
+            throw new AnsibleTowerDoesNotSupportAuthToken("Server does not have tokens endpoint: " + tokenURI);
+        } else if(response.getStatusLine().getStatusCode() != 200 && response.getStatusLine().getStatusCode() != 201) {
+            throw new AnsibleTowerException("Unable to get oauth token, server responded with ("+ response.getStatusLine().getStatusCode() +")");
+        }
+
+        JSONObject responseObject;
+        String json;
+        try {
+            json = EntityUtils.toString(response.getEntity());
+            responseObject = JSONObject.fromObject(json);
+        } catch (IOException ioe) {
+            throw new AnsibleTowerException("Unable to read oatuh response and convert it into json: " + ioe.getMessage());
+        }
+
+        if (responseObject.containsKey("id")) {
+            this.oAuthTokenID = responseObject.getString("id");
+        }
+
+        if (responseObject.containsKey("token")) {
+            logger.logMessage("AuthToken acquired ("+ this.oAuthTokenID +")");
+            return responseObject.getString("token");
+        }
+        logger.logMessage(json);
+        throw new AnsibleTowerException("Did not get an oauth token from the request. Template response can be found in the jenkins.log");
+    }
+
     private String getAuthToken() throws AnsibleTowerException {
         logger.logMessage("Getting auth token for "+ this.username);
 
@@ -1023,7 +1075,7 @@ public class TowerConnector implements Serializable {
         if(response.getStatusLine().getStatusCode() == 400) {
             throw new AnsibleTowerException("Username/password invalid");
         } else if(response.getStatusLine().getStatusCode() == 404) {
-            throw new AnsibleTowerDoesNotSupportAuthtoken("Server does not have endpoint: " + tokenURI);
+            throw new AnsibleTowerDoesNotSupportAuthToken("Server does not have endpoint: " + tokenURI);
         } else if(response.getStatusLine().getStatusCode() != 200 && response.getStatusLine().getStatusCode() != 201) {
             throw new AnsibleTowerException("Unable to get auth token, server responded with ("+ response.getStatusLine().getStatusCode() +")");
         }
@@ -1043,5 +1095,32 @@ public class TowerConnector implements Serializable {
         }
         logger.logMessage(json);
         throw new AnsibleTowerException("Did not get a token from the request. Template response can be found in the jenkins.log");
+    }
+
+    public void releaseToken() {
+        if(this.oAuthTokenID != null) {
+            logger.logMessage("Deleting oAuth token "+ this.oAuthTokenID +" for " + this.username);
+            try {
+                String tokenURI = url + this.buildEndpoint("/tokens/" + this.oAuthTokenID + "/");
+                HttpDelete tokenRequest = new HttpDelete(tokenURI);
+                tokenRequest.setHeader(HttpHeaders.AUTHORIZATION, this.getBasicAuthString());
+
+                DefaultHttpClient httpClient = getHttpClient();
+                logger.logMessage("Calling for oAuth token delete at " + tokenURI);
+                HttpResponse response = httpClient.execute(tokenRequest);
+                if(response.getStatusLine().getStatusCode() == 400) {
+                    logger.logMessage("Unable to delete oAuthToken: Invalid Authorization");
+                } else if(response.getStatusLine().getStatusCode() != 204) {
+                    logger.logMessage("Unable to delete oauth token, server responded with ("+ response.getStatusLine().getStatusCode() +")");
+                }
+                logger.logMessage("oAuth Token deleted");
+
+                this.oAuthTokenID = null;
+                this.authorizationHeader = null;
+            } catch(Exception e) {
+                logger.logMessage("Failed to delete token: "+ e.getMessage());
+            }
+
+        }
     }
 }

@@ -105,6 +105,7 @@ public class TowerProjectSync implements Serializable {
 
     public void cancelSync() throws AnsibleTowerException {
         HttpResponse response = this.connection.makeRequest(connection.POST, syncData.getJSONObject("related").getString("cancel"), null, false);
+        this.connection.releaseToken();
         // 202 is the expected response so we can ignore this
         // 405 can mean that the project sync can't be canceled
         if (response.getStatusLine().getStatusCode() != 202 && response.getStatusLine().getStatusCode() != 405) {
@@ -118,5 +119,9 @@ public class TowerProjectSync implements Serializable {
 
     public Integer getID() {
         return syncData.getInt("id");
+    }
+
+    public void releaseToken() throws AnsibleTowerException {
+        this.connection.releaseToken();
     }
 }

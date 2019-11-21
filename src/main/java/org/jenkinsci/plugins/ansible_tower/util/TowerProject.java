@@ -79,4 +79,8 @@ public class TowerProject implements Serializable {
         TowerProjectSync mySync = new TowerProjectSync(this.myConnector, this);
         return mySync;
     }
+
+    public void releaseToken() throws AnsibleTowerException {
+        myConnector.releaseToken();
+    }
 }

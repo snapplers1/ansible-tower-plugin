@@ -140,6 +140,7 @@ public class AnsibleTowerRunner {
             template = myTowerConnection.getJobTemplate(expandedJobTemplate, templateType);
         } catch (AnsibleTowerException e) {
             logger.println("ERROR: Unable to lookup job template " + e.getMessage());
+            myTowerConnection.releaseToken();
             return false;
         }
 
@@ -183,6 +184,7 @@ public class AnsibleTowerRunner {
             this.myJob.setJobId(myTowerConnection.submitTemplate(template.getInt("id"), expandedExtraVars, expandedLimit, expandedJobTags, expandedSkipJobTags, jobType, expandedInventory, expandedCredential, templateType));
         } catch (AnsibleTowerException e) {
             logger.println("ERROR: Unable to request job template invocation " + e.getMessage());
+            myTowerConnection.releaseToken();
             return false;
         }
 
@@ -194,12 +196,14 @@ public class AnsibleTowerRunner {
 
         if (async) {
             towerResults.put("job", this.myJob);
+            myTowerConnection.releaseToken();
             return true;
         }
 
         boolean jobCompleted = false;
         while (!jobCompleted) {
             if(Thread.currentThread().isInterrupted()) {
+                myTowerConnection.releaseToken();
                 return this.cancelJob(logger);
             }
 
@@ -211,6 +215,7 @@ public class AnsibleTowerRunner {
                     }
                 } catch (AnsibleTowerException e) {
                     logger.println("ERROR: Failed to get job events from tower: " + e.getMessage());
+                    myTowerConnection.releaseToken();
                     return false;
                 }
             }
@@ -218,15 +223,18 @@ public class AnsibleTowerRunner {
                 jobCompleted = this.myJob.isComplete();
             } catch (AnsibleTowerException e) {
                 logger.println("ERROR: Failed to get job status from Tower: " + e.getMessage());
+                myTowerConnection.releaseToken();
                 return false;
             }
             if (!jobCompleted) {
                 if(Thread.currentThread().isInterrupted()) {
+                    myTowerConnection.releaseToken();
                     return this.cancelJob(logger);
                 } else {
                     try {
                         Thread.sleep(3000);
                     } catch (InterruptedException ie) {
+                        myTowerConnection.releaseToken();
                         return this.cancelJob(logger);
                     }
                 }
@@ -242,6 +250,7 @@ public class AnsibleTowerRunner {
                 }
             } catch (AnsibleTowerException e) {
                 logger.println("ERROR: Failed to get final job events from tower: " + e.getMessage());
+                myTowerConnection.releaseToken();
                 return false;
             }
         }
@@ -251,6 +260,7 @@ public class AnsibleTowerRunner {
             wasSuccessful = this.myJob.wasSuccessful();
         } catch(AnsibleTowerException e) {
             logger.println("ERROR: Failed to get job compltion status: "+ e.getMessage());
+            myTowerConnection.releaseToken();
             return false;
         }
 
@@ -259,6 +269,7 @@ public class AnsibleTowerRunner {
             jenkinsVariables = this.myJob.getExports();
         } catch(AnsibleTowerException e) {
             logger.println("Failed to get exported variables: "+ e);
+            myTowerConnection.releaseToken();
             return false;
         }
         for (Map.Entry<String, String> entrySet : jenkinsVariables.entrySet()) {
@@ -282,6 +293,7 @@ public class AnsibleTowerRunner {
                     envInjectActionSetter.addEnvVarsToRun(run, envVars);
                 } catch (Exception e) {
                     logger.println("Unable to inject environment variables: " + e.getMessage());
+                    myTowerConnection.releaseToken();
                     return false;
                 }
             }
@@ -295,6 +307,7 @@ public class AnsibleTowerRunner {
 
         towerResults.put("JOB_RESULT", wasSuccessful ? "SUCCESS" : "FAILED");
 
+        myTowerConnection.releaseToken();
         return wasSuccessful;
     }
 
@@ -360,6 +373,7 @@ public class AnsibleTowerRunner {
             myProject = new TowerProject(expandedProject, myTowerConnection);
         } catch(AnsibleTowerException e) {
             logger.println("ERROR: Unable to lookup project: " + e.getMessage());
+            myTowerConnection.releaseToken();
             return false;
         }
 
@@ -367,10 +381,12 @@ public class AnsibleTowerRunner {
         try {
             if (!myProject.canUpdate()) {
                 logger.println("ERROR: The requested project can not be synced, is it a manual project?");
+                myTowerConnection.releaseToken();
                 return false;
             }
         } catch(AnsibleTowerException e) {
             logger.println("ERROR: Failed to check if the project can be synced: "+ e.getMessage());
+            myTowerConnection.releaseToken();
             return false;
         }
 
@@ -384,6 +400,7 @@ public class AnsibleTowerRunner {
             projectSync = myProject.sync();
         } catch (AnsibleTowerException e) {
             logger.println("ERROR: Unable to request project sync invocation " + e.getMessage());
+            myTowerConnection.releaseToken();
             return false;
         }
 
@@ -395,6 +412,7 @@ public class AnsibleTowerRunner {
         // If we are async, we can just return the project sync object
         if (async) {
             towerResults.put("sync", projectSync);
+            myTowerConnection.releaseToken();
             return true;
         }
 
@@ -402,6 +420,7 @@ public class AnsibleTowerRunner {
         boolean syncCompleted = false;
         while (!syncCompleted) {
             if(Thread.currentThread().isInterrupted()) {
+                myTowerConnection.releaseToken();
                 return this.cancelProjectSync(logger, projectSync);
             }
 
@@ -413,6 +432,7 @@ public class AnsibleTowerRunner {
                     }
                 } catch (AnsibleTowerException e) {
                     logger.println("ERROR: Failed to get project sync events from tower: " + e.getMessage());
+                    myTowerConnection.releaseToken();
                     return false;
                 }
             }
@@ -420,15 +440,18 @@ public class AnsibleTowerRunner {
                 syncCompleted = projectSync.isComplete();
             } catch (AnsibleTowerException e) {
                 logger.println("ERROR: Failed to get project sync status from Tower: " + e.getMessage());
+                myTowerConnection.releaseToken();
                 return false;
             }
             if (!syncCompleted) {
                 if(Thread.currentThread().isInterrupted()) {
+                    myTowerConnection.releaseToken();
                     return this.cancelProjectSync(logger, projectSync);
                 } else {
                     try {
                         Thread.sleep(3000);
                     } catch (InterruptedException ie) {
+                        myTowerConnection.releaseToken();
                         return this.cancelProjectSync(logger, projectSync);
                     }
                 }
@@ -444,6 +467,7 @@ public class AnsibleTowerRunner {
                 }
             } catch (AnsibleTowerException e) {
                 logger.println("ERROR: Failed to get final project sync events from tower: " + e.getMessage());
+                myTowerConnection.releaseToken();
                 return false;
             }
         }
@@ -453,6 +477,7 @@ public class AnsibleTowerRunner {
             wasSuccessful = projectSync.wasSuccessful();
         } catch(AnsibleTowerException e) {
             logger.println("ERROR: Failed to get project sync compltion status: "+ e.getMessage());
+            myTowerConnection.releaseToken();
             return false;
         }
         towerResults.put("SYNC_RESULT", wasSuccessful ? "SUCCESS" : "FAILED");
@@ -465,6 +490,7 @@ public class AnsibleTowerRunner {
             logger.println("Tower failed to complete the requested project sync");
         }
 
+        myTowerConnection.releaseToken();
         return wasSuccessful;
     }
 }

@@ -29,6 +29,15 @@ The fields are as follows:
 
 Once the settings are completed, you can test the connection between Jenkins and Ansible Tower by clicking on the Test Connection button.
 
+## Basic Authentication
+
+This plugin can use a username password to attempt to authenticate with Tower. As of plugin version 0.13.0 when using username/password the plugin will attempt to:
+  * Pull an OAuth2 token
+  * Attempt to use a pre-oauth authtoken
+  * Fall back to basic auth
+
+If you are using plugin version >= 0.13.0 with Basic Auth and pipelines levaraging the async method please see the note at the bottom of section `Async Execution` for details about freeing Tower tokens.
+
 ## OAuth Authentication
 
 Starting in Tower version 3.3.0, Oauth Authentication can be used alongside basic auth. Beginning in Tower version 3.4.0, **basic authentication will be disabled**.
@@ -217,6 +226,9 @@ stage('Process Tower results') {
         } else {
             error("The job did not end well")
         }
+
+        // Release the Tower token (see note below)
+        job.releaseToken()
     }
 }
 ```
@@ -228,6 +240,7 @@ stage('Process Tower results') {
 * method org.jenkinsci.plugins.ansible_tower.util.TowerJob getLogs
 * method org.jenkinsci.plugins.ansible_tower.util.TowerJob isComplete
 * method org.jenkinsci.plugins.ansible_tower.util.TowerJob wasSuccessful
+* method org.jenkinsci.plugins.ansible_tower.util.TowerJob releaseToken
 * new java.util.HashMap
 * new java.util.Vector
 
@@ -235,8 +248,13 @@ Using ansibleTowerProjectSync will require similar script apprivals:
 * method org.jenkinsci.plugins.ansible_tower.util.TowerProjectSync getLogs
 * method org.jenkinsci.plugins.ansible_tower.util.TowerProjectSync isComplete
 * method org.jenkinsci.plugins.ansible_tower.util.TowerProjectSync wasSuccessful
+* method org.jenkinsci.plugins.ansible_tower.util.TowerProjectSync releaseToken
 
 Please consider if you want these options added and use at your own risk.
+
+
+**Note:** with release 0.13 new auth procedures were implemented. If you are using a username/password credential a token will attempt to be retreived when calling the Tower API. When running with the async option, the token will be released as soon as controll is returned to your groovy script. If you many another call to the API (i.e. by calling getLogs) a new Token will be established. It is your responsibility to remove that token when you no longer need it. Failure to do so will leave dangeling tokens in Tower.
+
 
 ## Expanding Env Vars
 
