@@ -36,7 +36,7 @@ This plugin can use a username password to attempt to authenticate with Tower. A
   * Attempt to use a pre-oauth authtoken
   * Fall back to basic auth
 
-If you are using plugin version >= 0.13.0 with Basic Auth and pipelines levaraging the async method please see the note at the bottom of section `Async Execution` for details about freeing Tower tokens.
+If you are using plugin version >= 0.13.0 with Basic Auth and pipelines leveraging the async method please see the note at the bottom of section `Async Execution` for details about freeing Tower tokens.
 
 ## OAuth Authentication
 
@@ -92,7 +92,7 @@ In a freestyle project a new build step called Ansible Tower is now available:
 | Verbose | Add additional messages to the Jenkins console about the job run.|
 | Import Tower Output | Pull all of the logs from Ansible Tower into the Jenkins console.|
 | Import Workflow Child Output | Pull in the output from all of the jobs that the template runs.|
-| Remove Color | When importing the Ansible Tower output, strip off the ansi color codings.|
+| Remove Color | When importing the Ansible Tower output, strip off the ansi color encodings.|
 
 ### Pipeline support
 Tower jobs can be executed from workflow scripts.
@@ -136,7 +136,7 @@ In a freestyle project a new build called Ansible Tower Project Sync is now avai
 | Project Name | The name of the project to perform the SCM sync. |
 | Verbose | Add additional messages to the Jenkins console about the job run.|
 | Import Tower Output | Pull all of the logs from Ansible Tower into the Jenkins console.|
-| Remove Color | When importing the Ansible Tower output, strip off the ansi color codings.|
+| Remove Color | When importing the Ansible Tower output, strip off the ansi color encodings.|
 
 ### Pipeline Support
 Project syncs can be executed from workflow scripts. The ansibleTowerProjectSync function is made available through this plugin. The towerServer and project parameters are the only ones required.
@@ -152,9 +152,40 @@ Project syncs can be executed from workflow scripts. The ansibleTowerProjectSync
         )
 ```
 
+## Project Revision
+
+**Note:** You can run a project revision on a non-scm project. This will not raise an error to Jenkins as the Tower API will allow this to happen. 
+
+**Note:** Tower will auto sync the project on the change of the revision. Therefore calling Ansible Tower Project Sync in a job after the update is redundant.
+
+### Adding a Build Step
+In a freestyle project a new build called Ansible Tower Project Revision is now available:
+
+![Project Revision Build Step](/docs/images/project_revision_freestyle.png)
+
+| Field | Description |
+|-------|-------------|
+| Tower Server | The predefined Ansible Tower server to run the sync on. |
+| Tower Credentials Override | Overrides the credentials from global Ansible Tower configuration. |
+| Project Name | The name of the project to perform the SCM sync. |
+| Revision | The revision to set for the specified project.|
+| Verbose | Add additional messages to the Jenkins console about the job run.|
+
+### Pipeline Support
+Project revision can be executed from workflow scripts. The ansibleTowerProjectRevision function is made available through this plugin. The towerServer, project and revision parameters are the only ones required.
+```groovy
+        projectSyncResults = ansibleTowerProjectRevision(
+            towerServer: 'EC2 AWX 8',
+            project: 'Demo Project',
+            revision: 'v1.0',
+            throwExceptionWhenFail: false,
+            verbose: false
+        )
+```
+
 ## Async Execution
 
-As of version 0.10.0, pipeline scripts support the async option. This will run the Tower task but immediately return the control of the job back to Jenkins. In the return value from either ansibleTower or ansibleTowerProjectSync will be an object that can be used later on to interact with the job:
+As of version 0.10.0, pipeline scripts that run jobs within Tower support the async option. This will run the Tower task but immediately return the control of the job back to Jenkins. In the return value from either ansibleTower or ansibleTowerProjectSync will be an object that can be used later on to interact with the job:
 
 ```groovy
 stage('Launch Tower job') {
@@ -244,7 +275,7 @@ stage('Process Tower results') {
 * new java.util.HashMap
 * new java.util.Vector
 
-Using ansibleTowerProjectSync will require similar script apprivals:
+Using ansibleTowerProjectSync will require similar script approvals:
 * method org.jenkinsci.plugins.ansible_tower.util.TowerProjectSync getLogs
 * method org.jenkinsci.plugins.ansible_tower.util.TowerProjectSync isComplete
 * method org.jenkinsci.plugins.ansible_tower.util.TowerProjectSync wasSuccessful
@@ -253,7 +284,7 @@ Using ansibleTowerProjectSync will require similar script apprivals:
 Please consider if you want these options added and use at your own risk.
 
 
-**Note:** with release 0.13 new auth procedures were implemented. If you are using a username/password credential a token will attempt to be retreived when calling the Tower API. When running with the async option, the token will be released as soon as controll is returned to your groovy script. If you many another call to the API (i.e. by calling getLogs) a new Token will be established. It is your responsibility to remove that token when you no longer need it. Failure to do so will leave dangeling tokens in Tower.
+**Note:** with release 0.13 new auth procedures were implemented. If you are using a username/password credential a token will attempt to be retrieved when calling the Tower API. When running with the async option, the token will be released as soon as control is returned to your groovy script. If you many another call to the API (i.e. by calling getLogs) a new Token will be established. It is your responsibility to remove that token when you no longer need it. Failure to do so will leave dangling tokens in Tower.
 
 
 ## Expanding Env Vars

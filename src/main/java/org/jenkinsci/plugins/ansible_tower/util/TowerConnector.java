@@ -42,6 +42,8 @@ import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerItemDoesNotExi
 public class TowerConnector implements Serializable {
     public static final int GET = 1;
     public static final int POST = 2;
+    public static final int PATCH = 3;
+    public static final String[] method_names = { "", "GET", "POST", "PATCH" };
     public static final String JOB_TEMPLATE_TYPE = "job";
     public static final String WORKFLOW_TEMPLATE_TYPE = "workflow";
     private static final String ARTIFACTS = "artifacts";
@@ -156,27 +158,31 @@ public class TowerConnector implements Serializable {
             throw new AnsibleTowerException("URL issue: "+ e.getMessage());
         }
 
-        logger.logMessage("building request to "+ myURI.toString());
+        logger.logMessage("Building "+ method_names[requestType] +" request to "+ myURI.toString());
 
         HttpUriRequest request;
         if(requestType == GET) {
             request = new HttpGet(myURI);
-        } else if(requestType ==  POST) {
-            HttpPost myPost = new HttpPost(myURI);
-            if(body != null && !body.isEmpty()) {
+        } else if(requestType ==  POST || requestType == PATCH) {
+            HttpEntityEnclosingRequestBase myRequest;
+            if(requestType == POST) {
+                myRequest = new HttpPost(myURI);
+            } else {
+                myRequest = new HttpPatch(myURI);
+            }
+            if (body != null && !body.isEmpty()) {
                 try {
                     StringEntity bodyEntity = new StringEntity(body.toString());
-                    myPost.setEntity(bodyEntity);
-                } catch(UnsupportedEncodingException uee) {
-                    throw new AnsibleTowerException("Unable to encode body as JSON: "+ uee.getMessage());
+                    myRequest.setEntity(bodyEntity);
+                } catch (UnsupportedEncodingException uee) {
+                    throw new AnsibleTowerException("Unable to encode body as JSON: " + uee.getMessage());
                 }
             }
-            request = myPost;
+            request = myRequest;
             request.setHeader("Content-Type", "application/json");
         } else {
             throw new AnsibleTowerException("The requested method is unknown");
         }
-
 
         // If we haven't determined auth yet we need to go get it
         if(!noAuth) {

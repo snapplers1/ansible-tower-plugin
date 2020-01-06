@@ -493,4 +493,66 @@ public class AnsibleTowerRunner {
         myTowerConnection.releaseToken();
         return wasSuccessful;
     }
+
+    public boolean projectRevision(PrintStream logger,
+                                   String towerServer, String towerCredentialsId,
+                                   String projectName, String revision,
+                                   boolean verbose,
+                                   EnvVars envVars, FilePath ws, Run<?, ?> run, Properties towerResults) {
+
+        if (verbose) {
+            logger.println("Beginning Ansible Tower Project Revision on " + towerServer +" for "+ projectName);
+        }
+
+        // Get our Tower connector
+        AnsibleTowerGlobalConfig myConfig = new AnsibleTowerGlobalConfig();
+        TowerInstallation towerConfigToRunOn = myConfig.getTowerInstallationByName(towerServer);
+        if (towerConfigToRunOn == null) {
+            logger.println("ERROR: Ansible tower server " + towerServer + " does not exist in Ansible Tower configuration");
+            return false;
+        }
+
+        // Apply credential override if provided
+        if(towerCredentialsId != null && !towerCredentialsId.equals("")) {
+            towerConfigToRunOn.setTowerCredentialsId(towerCredentialsId);
+        }
+
+        TowerConnector myTowerConnection = towerConfigToRunOn.getTowerConnector();
+
+        // Expand all of the parameters
+        String expandedProject = envVars.expand(projectName);
+        String expandedRevision = envVars.expand(revision);
+
+        if (verbose) {
+            if (expandedProject != null && !expandedProject.equals(projectName)) {
+                logger.println("Expanded project to " + expandedProject);
+            }
+            if (expandedRevision != null && !expandedRevision.equals(revision)) {
+                logger.println("Expanded revision to " + expandedRevision);
+            }
+        }
+
+        // Get the project (this will also validates the project exists)
+        TowerProject myProject = null;
+        try {
+            myProject = new TowerProject(expandedProject, myTowerConnection);
+        } catch(AnsibleTowerException e) {
+            logger.println("ERROR: Unable to lookup project: " + e.getMessage());
+            myTowerConnection.releaseToken();
+            return false;
+        }
+
+        if (verbose) {
+            logger.println("Requesting tower to update " + expandedProject + " revision to " + expandedRevision);
+        }
+
+        // Update project revision
+        try {
+            return myProject.updateRevision(expandedRevision);
+        } catch(AnsibleTowerException e) {
+            logger.println("ERROR: Unable to update project revision "+ e.getMessage());
+            myTowerConnection.releaseToken();
+            return false;
+        }
+    }
 }

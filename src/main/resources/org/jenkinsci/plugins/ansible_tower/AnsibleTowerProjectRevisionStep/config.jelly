@@ -9,19 +9,13 @@
     <f:entry field="project" title="Project Name" help="/plugin/ansible-tower/help-project.html">
         <f:textbox/>
     </f:entry>
+    <f:entry field="revision" title="Revision" help="/plugin/ansible-tower/help-project-revision.html">
+        <f:textbox/>
+    </f:entry>
     <f:entry field="verbose" title="Verbose" help="/plugin/ansible-tower/help-verbose.html">
         <f:checkbox />
     </f:entry>
-    <f:entry field="importTowerLogs" title="Import Tower Output" help="/plugin/ansible-tower/help-import-tower-output.html">
-        <f:checkbox />
-    </f:entry>
-    <f:entry field="removeColor" title="Remove Color" help="/plugin/ansible-tower/help-remove-color.html">
-        <f:checkbox />
-    </f:entry>
     <f:entry field="throwExceptionWhenFail" title="Throw exception on failure" help="/plugin/ansible-tower/help-throwExceptionWhenFail.html">
-        <f:checkbox />
-    </f:entry>
-    <f:entry field="async" title="Run Async" help="/plugin/ansible-tower/help-async.html">
         <f:checkbox />
     </f:entry>
 </j:jelly>

@@ -11,6 +11,8 @@ import java.io.Serializable;
 
 public class TowerProject implements Serializable {
     String projectName;
+    String apiEndPoint = "/projects/";
+    String projectID = "";
     TowerConnector myConnector = null;
     JSONObject projectData = null;
     JSONObject updateResponse = null;
@@ -22,11 +24,8 @@ public class TowerProject implements Serializable {
             throw new AnsibleTowerException("Template can not be null");
         }
 
-        String apiEndPoint = "/projects/";
-
-        String projectID = "";
         try {
-            projectID = myConnector.convertPotentialStringToID(projectName, apiEndPoint);
+            this.projectID = myConnector.convertPotentialStringToID(projectName, this.apiEndPoint);
         } catch(AnsibleTowerItemDoesNotExist atidne) {
             throw new AnsibleTowerException("Project "+ projectName +" does not exist in tower");
         } catch(AnsibleTowerException ate) {
@@ -73,6 +72,27 @@ public class TowerProject implements Serializable {
             }
         }
         return this.updateResponse.getBoolean("can_update");
+    }
+
+    public boolean updateRevision(String revision) throws AnsibleTowerException {
+        // Attempt to update the project ID
+
+        String finalEndPoint = this.apiEndPoint + projectID +"/";
+        JSONObject patchBody = new JSONObject();
+        patchBody.put("scm_branch", revision);
+
+        HttpResponse response;
+        try {
+            response = myConnector.makeRequest(myConnector.PATCH, finalEndPoint, patchBody, false);
+        } catch(AnsibleTowerException e) {
+            throw new AnsibleTowerException("Failed to update project revision for "+ projectName +": "+ e.getMessage());
+        }
+        if (response.getStatusLine().getStatusCode() != 200) {
+            throw new AnsibleTowerException("Unexpected response code returned when updating project (" + response.getStatusLine().getStatusCode() + ")");
+        }
+
+        // If we made it down here we were successful so we can return
+        return true;
     }
 
     public TowerProjectSync sync() throws AnsibleTowerException {
