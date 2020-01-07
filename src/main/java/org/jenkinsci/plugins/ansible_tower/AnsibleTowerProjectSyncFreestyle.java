@@ -138,8 +138,8 @@ public class AnsibleTowerProjectSyncFreestyle extends Builder {
 
 		// This requires a POST method to protect from CSFR
 		@POST
-		public ListBoxModel doFillTowerCredentialsIdItems(@AncestorInPath Item item, @QueryParameter String credentialsId) {
-			return GetUserPageCredentials.getUserAvailableCredentials(item, credentialsId);
+		public ListBoxModel doFillTowerCredentialsIdItems(@AncestorInPath Item item, @QueryParameter String towerCredentialsId) {
+			return GetUserPageCredentials.getUserAvailableCredentials(item, towerCredentialsId);
 		}
     }
 }
