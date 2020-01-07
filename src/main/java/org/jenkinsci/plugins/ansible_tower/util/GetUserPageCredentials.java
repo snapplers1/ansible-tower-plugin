@@ -1,9 +1,16 @@
 package org.jenkinsci.plugins.ansible_tower.util;
 
+import com.cloudbees.plugins.credentials.CredentialsMatcher;
+import com.cloudbees.plugins.credentials.CredentialsMatchers;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
+import com.cloudbees.plugins.credentials.common.StandardCredentials;
 import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
 import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
+import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
+import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import hudson.model.Item;
+import hudson.model.Queue;
+import hudson.model.queue.Tasks;
 import hudson.security.ACL;
 import hudson.util.ListBoxModel;
 import jenkins.model.Jenkins;
@@ -24,14 +31,21 @@ public class GetUserPageCredentials {
                 return result.includeCurrentValue(credentialsId);
             }
         }
-        return result.includeEmptyValue().includeAs(
-                ACL.SYSTEM,
-                Jenkins.get(),
-                StandardUsernameCredentials.class
-        ).includeAs(
-                ACL.SYSTEM,
-                Jenkins.get(),
-                StringCredentials.class
+
+        CredentialsMatcher CREDENTIALS_MATCHER = CredentialsMatchers.anyOf(
+                CredentialsMatchers.instanceOf(StandardUsernamePasswordCredentials.class),
+                CredentialsMatchers.instanceOf(StringCredentials.class)
+        );
+
+
+        return result.includeEmptyValue().includeMatchingAs(
+                item instanceof Queue.Task
+                        ? Tasks.getAuthenticationOf((Queue.Task) item)
+                        : ACL.SYSTEM,
+                item,
+                StandardCredentials.class,
+                URIRequirementBuilder.create().withoutHostnamePort().withoutScheme().withoutPath().build(),
+                CREDENTIALS_MATCHER
         ).includeCurrentValue(credentialsId);
     }
 }
