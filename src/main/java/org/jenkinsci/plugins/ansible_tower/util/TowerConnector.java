@@ -40,10 +40,10 @@ import org.apache.http.util.EntityUtils;
 import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerItemDoesNotExist;
 
 public class TowerConnector implements Serializable {
+    // If adding a new method, make sure to update getMethodName()
     public static final int GET = 1;
     public static final int POST = 2;
     public static final int PATCH = 3;
-    public static final String[] method_names = { "", "GET", "POST", "PATCH" };
     public static final String JOB_TEMPLATE_TYPE = "job";
     public static final String WORKFLOW_TEMPLATE_TYPE = "workflow";
     private static final String ARTIFACTS = "artifacts";
@@ -158,7 +158,7 @@ public class TowerConnector implements Serializable {
             throw new AnsibleTowerException("URL issue: "+ e.getMessage());
         }
 
-        logger.logMessage("Building "+ method_names[requestType] +" request to "+ myURI.toString());
+        logger.logMessage("Building "+ getMethodName(requestType) +" request to "+ myURI.toString());
 
         HttpUriRequest request;
         if(requestType == GET) {
@@ -1128,5 +1128,12 @@ public class TowerConnector implements Serializable {
             }
 
         }
+    }
+
+    public String getMethodName(int methodId) {
+        if(methodId == 1) { return "GET"; }
+        else if(methodId == 2) { return "POST"; }
+        else if(methodId == 3) { return "PATCH"; }
+        else { return "UNKNOWN"; }
     }
 }
