@@ -506,12 +506,18 @@ public class TowerConnector implements Serializable {
             Now that we have processed everything we have to decide which way to pass it into the API.
             Pre 3.3 there were three possible parameters:
                 extra_vars, vault_credential, machine_credential
-            Starting in 3.3 you can take the seperate parameters or you can pass them all as a single credential param
+            Starting in 3.3 you can take the separate parameters or you can pass them all as a single credential param
 
-            The decision point will be wheter or not there is more than one machine or vault credential.
-            This is because the old method is not deprecated but it can't handle more than machine/vault credential
+            Previously the decision point was whether or not we had multiple machine or vault creds.
+            This was because both formats were accepted at one point.
+
+            That behaviour has since been deprecated.
+            We will now check if the version of tower is > 3.5.0 or we have multiple credential types
          */
-        if(credentials.get("machine").size() > 1 || credentials.get("vault").size() > 1) {
+        if(
+                this.towerVersion.is_greater_or_equal("3.5.0") ||
+                (credentials.get("machine").size() > 1 || credentials.get("vault").size() > 1)
+        ) {
             // We need to pass as a new field
             JSONArray allCredentials = new JSONArray();
             allCredentials.addAll(credentials.get("machine"));
