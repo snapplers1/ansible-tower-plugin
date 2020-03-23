@@ -13,7 +13,8 @@ public class TowerVersion implements Serializable {
     public TowerVersion(String version) throws AnsibleTowerException {
         this.version = version;
         String[] parts = version.split("\\.");
-        if(parts.length != 3) {
+        // AWX v8.0.0 has 4 parts as in: 8.0.0.0 so instead of != 3 we should be able to do < 3 and get the same results
+        if(parts.length < 3) {
             System.out.println("Got "+ parts.length +" segments");
             throw new AnsibleTowerException("The version passed to TowerVersion must be in the format X.Y.Z");
         }
