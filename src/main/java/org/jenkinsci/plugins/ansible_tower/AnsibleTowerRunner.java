@@ -173,6 +173,15 @@ public class AnsibleTowerRunner {
         if (expandedCredential != null && template.containsKey("ask_credential_on_launch") && !template.getBoolean("ask_credential_on_launch")) {
             logger.println("[WARNING]: Credential defined but prompt for credential on launch is not set in tower job");
         }
+        if (expandedScmBranch != null) {
+            if(template.containsKey("ask_scm_branch_on_launch")) {
+                if(!template.getBoolean("ask_scm_branch_on_launch")) {
+                    logger.println("[WARNING]: SCM Branch defined but pompt for SCM back on launch is not set in tower job");
+                }
+            } else {
+                logger.println("[WARNING]: SCM Branch defined but job template does not appear to support SCM branch on launch");
+            }
+        }
         // Here are some more options we may want to use someday
         //    "ask_diff_mode_on_launch": false,
         //    "ask_skip_tags_on_launch": false,

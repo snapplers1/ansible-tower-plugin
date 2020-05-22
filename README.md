@@ -84,11 +84,12 @@ In a freestyle project a new build step called Ansible Tower is now available:
 | Template ID | The name or numerical ID of the template to be run on the Ansible Tower server.|
 | Extra Vars | Additional variables to be passed to the job. I.e.:<br/>---<br/>my_var: This is a variable called my_var|
 | Job Tags | Any job tags to be passed to Ansible Tower.|
-|Skip Job Tags | Any skip tags to be passed to Ansible Tower.|
-|Job Type | Is this a template run or a check.|
-|Limit | The servers to limit the invocation to.|
-|Inventory | The name or numeric ID of the inventory to run the job on.|
+| Skip Job Tags | Any skip tags to be passed to Ansible Tower.|
+| Job Type | Is this a template run or a check.|
+| Limit | The servers to limit the invocation to.|
+| Inventory | The name or numeric ID of the inventory to run the job on.|
 | Credential | The name or numeric ID of the credentials to run the job with.|
+| SCM Branch | The name of the SCM branch to overide while running te job.|
 | Verbose | Add additional messages to the Jenkins console about the job run.|
 | Import Tower Output | Pull all of the logs from Ansible Tower into the Jenkins console.|
 | Import Workflow Child Output | Pull in the output from all of the jobs that the template runs.|
