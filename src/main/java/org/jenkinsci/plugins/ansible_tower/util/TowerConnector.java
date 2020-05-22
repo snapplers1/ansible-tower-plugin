@@ -9,6 +9,7 @@ import net.sf.json.JSONArray;
 import org.apache.http.Header;
 import org.apache.http.client.methods.*;
 import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerDoesNotSupportAuthToken;
+import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerRefusesToGiveToken;
 import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerException;
 
 import java.io.*;
@@ -196,13 +197,52 @@ public class TowerConnector implements Serializable {
                     this.authorizationHeader = "Bearer "+ this.oauthToken;
                 } else if(this.username != null && this.password != null) {
                     // Second, if we have a username and a password we can try to go get a token
+
+                    // For trying to get a token, we will first attempt to self create an oAuthToken if Tower supports it
                     if (this.towerSupports("/api/o/")) {
                         logger.logMessage("Getting an oAuth token for "+ this.username);
-                        this.authorizationHeader = "Bearer " + this.getOAuthToken();
-                    } else if (this.towerSupports("/api/v2/authtoken")) {
-                        logger.logMessage("Getting a legacy token for "+ this.username);
-                        this.authorizationHeader = "Token " + this.getAuthToken();
-                    } else {
+                        try {
+                            this.authorizationHeader = "Bearer " + this.getOAuthToken();
+                        } catch(AnsibleTowerException ate) {
+                            logger.logMessage("Unable to get oAuth Toekn: "+ ate.getMessage());
+                        }
+                    }
+
+                    // Second, we will try to get a legacy authtoken if Tower supports if
+                    if(this.authorizationHeader == null && this.towerSupports("/api/v2/authtoken")) {
+                        logger.logMessage("Getting a legacy token for " + this.username);
+                        try {
+                            this.authorizationHeader = "Token " + this.getAuthToken();
+                        } catch (AnsibleTowerException ate) {
+                            logger.logMessage("Unable to get legacuy token: " + ate.getMessage());
+                        }
+                    }
+
+                    // Finally, we will revert to basic auth.
+                    // There could be a case where someone allows basic auth to the API and
+                    // Refuses oAuth token creation for LDAO based users.
+                    // This would allow for that conditio
+                    /* To test this scenario I created an AWX devel install and added this line:
+                        ----------------------------------------------------------------
+                        diff --git a/awx/main/models/oauth.py b/awx/main/models/oauth.py
+                        index 51bb9be0e..b2b9d80aa 100644
+                                --- a/awx/main/models/oauth.py
+                                +++ b/awx/main/models/oauth.py
+                        @@ -135,6 +135,7 @@ class OAuth2AccessToken(AbstractAccessToken):
+                        return valid
+
+                        def validate_external_users(self):
+                        +        raise oauth2.AccessDeniedError('OAuth2 Tokens cannot be created')
+                        if self.user and settings.ALLOW_OAUTH2_FOR_EXTERNAL_USERS is False:
+                        external_account = get_external_account(self.user)
+                        if external_account is not None:
+                        ----------------------------------------------------------------
+                        This made it impossible for any user to get an oAuth toekn
+                        simulating what would happen to a user if they were an LDAP source and the option to
+                        disable tokens for LDAP users were turned on.
+                    */
+
+                    if (this.authorizationHeader == null) {
                         logger.logMessage("Tower does not support authtoken or oauth, reverting to basic auth");
                         this.authorizationHeader = this.getBasicAuthString();
                     }
@@ -1031,10 +1071,12 @@ public class TowerConnector implements Serializable {
             throw new AnsibleTowerException("Unable to make request for an oauth token: "+ e.getMessage());
         }
 
-        if(response.getStatusLine().getStatusCode() == 400) {
+        if(response.getStatusLine().getStatusCode() == 400 || response.getStatusLine().getStatusCode() == 401) {
             throw new AnsibleTowerException("Username/password invalid");
         } else if(response.getStatusLine().getStatusCode() == 404) {
             throw new AnsibleTowerDoesNotSupportAuthToken("Server does not have tokens endpoint: " + tokenURI);
+        } else if(response.getStatusLine().getStatusCode() == 403) {
+            throw new AnsibleTowerRefusesToGiveToken("Server refuses to give tokens");
         } else if(response.getStatusLine().getStatusCode() != 200 && response.getStatusLine().getStatusCode() != 201) {
             throw new AnsibleTowerException("Unable to get oauth token, server responded with ("+ response.getStatusLine().getStatusCode() +")");
         }
