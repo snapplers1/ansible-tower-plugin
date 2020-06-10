@@ -67,6 +67,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
         this.scmBranch = scmBranch;
         this.verbose = verbose;
         this.towerLogLevel = importTowerLogs.toString();
+        this.importTowerLogs = importTowerLogs;
         this.removeColor = removeColor;
         this.templateType = templateType;
         this.importWorkflowChildLogs = importWorkflowChildLogs;
@@ -133,7 +134,10 @@ public class AnsibleTowerStep extends AbstractStepImpl {
 	@DataBoundSetter
     public void setVerbose(Boolean verbose) { this.verbose = verbose; }
     @DataBoundSetter
-    public void setImportTowerLogs(Boolean importTowerLogs) { this.towerLogLevel = importTowerLogs.toString(); }
+    public void setImportTowerLogs(Boolean importTowerLogs) {
+        this.importTowerLogs = importTowerLogs;
+        this.towerLogLevel = importTowerLogs.toString();
+    }
     @DataBoundSetter
     public void setTowerLogLevel(String importTowerLogs) { this.towerLogLevel = importTowerLogs; }
     @DataBoundSetter
