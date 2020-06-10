@@ -43,16 +43,41 @@ public class AnsibleTower extends Builder {
     private String credential               = DescriptorImpl.credential;
 	private String scmBranch                = DescriptorImpl.scmBranch;
     private Boolean verbose                 = DescriptorImpl.verbose;
-    private Boolean importTowerLogs			= DescriptorImpl.importTowerLogs;
+    private String importTowerLogs			= DescriptorImpl.importTowerLogs;
     private Boolean removeColor				= DescriptorImpl.removeColor;
 	private String templateType				= DescriptorImpl.templateType;
 	private Boolean importWorkflowChildLogs	= DescriptorImpl.importWorkflowChildLogs;
+
+	/* Legacy constructor from 0.15.0 */
+	public AnsibleTower(
+			@Nonnull String towerServer, @Nonnull String jobTemplate, String towerCredentialsId, String jobType,
+			String extraVars, String jobTags, String skipJobTags, String limit, String inventory, String credential, String scmBranch,
+			Boolean verbose, Boolean importTowerLogs, Boolean removeColor, String templateType,
+			Boolean importWorkflowChildLogs
+	) {
+		this.towerServer = towerServer;
+		this.jobTemplate = jobTemplate;
+		this.towerCredentialsId = towerCredentialsId;
+		this.extraVars = extraVars;
+		this.jobTags = jobTags;
+		this.skipJobTags = skipJobTags;
+		this.jobType = jobType;
+		this.limit = limit;
+		this.inventory = inventory;
+		this.credential = credential;
+		this.scmBranch = scmBranch;
+		this.verbose = verbose;
+		this.importTowerLogs = importTowerLogs.toString();
+		this.removeColor = removeColor;
+		this.templateType = templateType;
+		this.importWorkflowChildLogs = importWorkflowChildLogs;
+	}
 
 	@DataBoundConstructor
 	public AnsibleTower(
 			@Nonnull String towerServer, @Nonnull String jobTemplate, String towerCredentialsId, String jobType,
 			String extraVars, String jobTags, String skipJobTags, String limit, String inventory, String credential, String scmBranch,
-			Boolean verbose, Boolean importTowerLogs, Boolean removeColor, String templateType,
+			Boolean verbose, String importTowerLogs, Boolean removeColor, String templateType,
 			Boolean importWorkflowChildLogs
 	) {
 		this.towerServer = towerServer;
@@ -87,7 +112,7 @@ public class AnsibleTower extends Builder {
 	public String getCredential() { return credential; }
 	public String getScmBranch() { return scmBranch; }
 	public Boolean getVerbose() { return verbose; }
-	public Boolean getImportTowerLogs() { return importTowerLogs; }
+	public String getImportTowerLogs() { return importTowerLogs; }
 	public Boolean getRemoveColor() { return removeColor; }
 	public String getTemplateType() { return templateType; }
 	public Boolean getImportWorkflowChildLogs() { return importWorkflowChildLogs; }
@@ -117,7 +142,9 @@ public class AnsibleTower extends Builder {
 	@DataBoundSetter
 	public void setVerbose(Boolean verbose) { this.verbose = verbose; }
 	@DataBoundSetter
-	public void setImportTowerLogs(Boolean importTowerLogs) { this.importTowerLogs = importTowerLogs; }
+	public void setImportTowerLogs(Boolean importTowerLogs) { this.importTowerLogs = importTowerLogs.toString(); }
+	@DataBoundSetter
+	public void setImportTowerLogs(String importTowerLogs) { this.importTowerLogs = importTowerLogs; }
 	@DataBoundSetter
 	public void setRemoveColor(Boolean removeColor) { this.removeColor = removeColor; }
 	@DataBoundSetter
@@ -171,7 +198,7 @@ public class AnsibleTower extends Builder {
 		public static final String credential     			= "";
 		public static final String scmBranch     			= "";
 		public static final Boolean verbose       			= false;
-		public static final Boolean importTowerLogs			= false;
+		public static final String importTowerLogs			= "false";
 		public static final Boolean removeColor				= false;
 		public static final String templateType				= "job";
 		public static final Boolean importWorkflowChildLogs	= false;
@@ -219,6 +246,14 @@ public class AnsibleTower extends Builder {
             return GetUserPageCredentials.getUserAvailableCredentials(item, towerCredentialsId);
 		}
 
+		public ListBoxModel doFillImportTowerLogsItems() {
+        	ListBoxModel items = new ListBoxModel();
+        	items.add("Do not import", "false");
+			items.add("Import Truncated Logs", "true");
+			items.add("Import Full Logs", "full");
+			items.add("Process Variables Only", "vars");
+			return items;
+		}
 
 		// Some day I'd like to be able to make all of these dropdowns from querying the tower API
 		// Maybe not in real time because that would be slow when loading a the configure job

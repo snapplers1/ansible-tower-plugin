@@ -15,7 +15,7 @@ This plugin connects Jenkins to [Ansible Tower](http://www.ansible.com/) to do t
 
 After installing the plugin you can configure Ansible Tower servers in the Jenkins Global Configuration under the section *Ansible Tower* by clicking the add button.
 
-![Configure Plugin](/docs/images/configuration-0.7.0.png)
+![Configure Plugin](./docs/images/configuration-0.7.0.png)
 
 The fields are as follows:
 
@@ -74,7 +74,7 @@ Jenkins Configuration
 
 In a freestyle project a new build step called Ansible Tower is now available:
 
-![Run Job Build Step](/docs/images/run_job_freestyle.png)
+![Run Job Build Step](./docs/images/run_job_freestyle.png)
 
 | Field | Description |
 |-------|-------------|
@@ -91,7 +91,7 @@ In a freestyle project a new build step called Ansible Tower is now available:
 | Credential | The name or numeric ID of the credentials to run the job with.|
 | SCM Branch | The name of the SCM branch to overide while running te job.|
 | Verbose | Add additional messages to the Jenkins console about the job run.|
-| Import Tower Output | Pull all of the logs from Ansible Tower into the Jenkins console.|
+| Import Tower Output | Pull the logs from Ansible Tower into the Jenkins console. Options include:<br/><ul><li><b>Do not import</b> Do not import the Ansible Tower logs into Jenkins (old checkbox not checked)</li><li><b>Import Truncated Logs</b> Pull in logs as they appear in Ansible Tower UI (long lines are truncated with ....) (old checkbox checked)</li><li><b>Import Full Logs</b> This will pull non-truncated events from Ansible Tower.</li><li><b>Process Variables Only</b> Consume the logs from Tower to process for variables but do not log in the Jenkins log.</li></ol>|
 | Import Workflow Child Output | Pull in the output from all of the jobs that the template runs.|
 | Remove Color | When importing the Ansible Tower output, strip off the ansi color encodings.|
 
@@ -107,7 +107,7 @@ node {
             towerCredentialsId: '',
             templateType: 'job',
             jobTemplate: 'Simple Test',
-            importTowerLogs: true,
+            towerLogLevel: 'full',
             inventory: 'Demo Inventory',
             jobTags: '',
             skipJobTags: '',
@@ -128,7 +128,7 @@ my_var:  "Jenkins Test"''',
 ### Adding a Build Step
 In a freestyle project a new build called Ansible Tower Project Sync is now available:
 
-![Project Sync Build Step](/docs/images/project_sync_freestyle.png)
+![Project Sync Build Step](./docs/images/project_sync_freestyle.png)
 
 | Field | Description |
 |-------|-------------|
@@ -162,7 +162,7 @@ Project syncs can be executed from workflow scripts. The ansibleTowerProjectSync
 ### Adding a Build Step
 In a freestyle project a new build called Ansible Tower Project Revision is now available:
 
-![Project Revision Build Step](/docs/images/project_revision_freestyle.png)
+![Project Revision Build Step](,/docs/images/project_revision_freestyle.png)
 
 | Field | Description |
 |-------|-------------|
