@@ -183,6 +183,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             ListBoxModel items = new ListBoxModel();
             items.add("job");
             items.add("workflow");
+            items.add("slice");
             return items;
         }
         public ListBoxModel doFillJobTypeItems() {

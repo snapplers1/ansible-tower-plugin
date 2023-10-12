@@ -17,7 +17,7 @@ public class TowerJob  implements Serializable {
     }
 
     public void setTemplateType(String templateType) throws AnsibleTowerException {
-        if (templateType == null || (!templateType.equalsIgnoreCase(TowerConnector.WORKFLOW_TEMPLATE_TYPE) && !templateType.equalsIgnoreCase(TowerConnector.JOB_TEMPLATE_TYPE))) {
+        if (templateType == null || (!templateType.equalsIgnoreCase(TowerConnector.WORKFLOW_TEMPLATE_TYPE) && !templateType.equalsIgnoreCase(TowerConnector.JOB_TEMPLATE_TYPE) && !templateType.equalsIgnoreCase(TowerConnector.SLICE_TEMPLATE_TYPE))) {
             throw new AnsibleTowerException("Template type "+ templateType +" was invalid");
         }
         this.templateType = templateType;

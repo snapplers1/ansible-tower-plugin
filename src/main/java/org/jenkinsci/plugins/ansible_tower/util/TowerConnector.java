@@ -47,6 +47,7 @@ public class TowerConnector implements Serializable {
     public static final int PATCH = 3;
     public static final String JOB_TEMPLATE_TYPE = "job";
     public static final String WORKFLOW_TEMPLATE_TYPE = "workflow";
+    public static final String SLICE_TEMPLATE_TYPE = "slice";
     private static final String ARTIFACTS = "artifacts";
     private static String API_VERSION = "v2";
 
@@ -264,6 +265,7 @@ public class TowerConnector implements Serializable {
         DefaultHttpClient httpClient = getHttpClient();
         HttpResponse response;
         try {
+            Thread.sleep(5000);
             response = httpClient.execute(request);
         } catch(Exception e) {
             throw new AnsibleTowerException("Unable to make tower request: "+ e.getMessage());
@@ -671,14 +673,15 @@ public class TowerConnector implements Serializable {
     public void checkTemplateType(String templateType) throws AnsibleTowerException {
         if(templateType.equalsIgnoreCase(JOB_TEMPLATE_TYPE)) { return; }
         if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)) { return; }
-        throw new AnsibleTowerException("Template type can only be '"+ JOB_TEMPLATE_TYPE +"' or '"+ WORKFLOW_TEMPLATE_TYPE+"'");
+        if(templateType.equalsIgnoreCase(SLICE_TEMPLATE_TYPE)) { return; }
+        throw new AnsibleTowerException("Template type can only be '" + JOB_TEMPLATE_TYPE + "' or '" + WORKFLOW_TEMPLATE_TYPE + "' or '" + SLICE_TEMPLATE_TYPE+"'");
     }
 
     public boolean isJobCompleted(int jobID, String templateType) throws AnsibleTowerException {
         checkTemplateType(templateType);
 
         String apiEndpoint = "/jobs/"+ jobID +"/";
-        if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)) { apiEndpoint = "/workflow_jobs/"+ jobID +"/"; }
+        if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE) || templateType.equalsIgnoreCase(SLICE_TEMPLATE_TYPE)) { apiEndpoint = "/workflow_jobs/"+ jobID +"/"; }
         HttpResponse response = makeRequest(GET, apiEndpoint);
 
         if(response.getStatusLine().getStatusCode() == 200) {
@@ -727,7 +730,7 @@ public class TowerConnector implements Serializable {
         checkTemplateType(templateType);
 
         String apiEndpoint = "/jobs/"+ jobID +"/";
-        if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)) { apiEndpoint = "/workflow_jobs/"+ jobID +"/"; }
+        if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE) || templateType.equalsIgnoreCase(SLICE_TEMPLATE_TYPE)) { apiEndpoint = "/workflow_jobs/"+ jobID +"/"; }
         apiEndpoint = apiEndpoint + "cancel/";
         HttpResponse response = makeRequest(GET, apiEndpoint);
 
@@ -799,7 +802,7 @@ public class TowerConnector implements Serializable {
         checkTemplateType(templateType);
         if(templateType.equalsIgnoreCase(JOB_TEMPLATE_TYPE)) {
             events.addAll(logJobEvents(jobID));
-        } else if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)){
+        } else if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE) || templateType.equalsIgnoreCase(SLICE_TEMPLATE_TYPE)){
             events.addAll(logWorkflowEvents(jobID, this.importChildWorkflowLogs));
         } else {
             throw new AnsibleTowerException("Tower Connector does not know how to log events for a "+ templateType);
@@ -1005,7 +1008,7 @@ public class TowerConnector implements Serializable {
         checkTemplateType(templateType);
 
         String apiEndPoint = "/jobs/"+ jobID +"/";
-        if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)) { apiEndPoint = "/workflow_jobs/"+ jobID +"/"; }
+        if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE) || templateType.equalsIgnoreCase(SLICE_TEMPLATE_TYPE)) { apiEndPoint = "/workflow_jobs/"+ jobID +"/"; }
         HttpResponse response = makeRequest(GET, apiEndPoint);
 
         if(response.getStatusLine().getStatusCode() == 200) {
