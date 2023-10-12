@@ -38,14 +38,16 @@ public class AnsibleTowerStep extends AbstractStepImpl {
     private String credential               = "";
     private String scmBranch                = "";
     private Boolean verbose                 = false;
-    private Boolean importTowerLogs         = false;
+    private Boolean importTowerLogs         = null;
+    private String towerLogLevel            = null;
     private Boolean removeColor             = false;
     private String templateType             = "job";
     private Boolean importWorkflowChildLogs = false;
     private Boolean throwExceptionWhenFail  = true;
     private Boolean async                   = false;
 
-    @DataBoundConstructor
+    /* This dericated function will remain here in order for any thing calling our plugin to remain functional */
+    @Deprecated
     public AnsibleTowerStep(
             @Nonnull String towerServer, @Nonnull String towerCredentialsId, @Nonnull String jobTemplate, String jobType, String extraVars, String jobTags,
             String skipJobTags, String limit, String inventory, String credential, String scmBranch, Boolean verbose,
@@ -64,12 +66,25 @@ public class AnsibleTowerStep extends AbstractStepImpl {
         this.credential = credential;
         this.scmBranch = scmBranch;
         this.verbose = verbose;
+        this.towerLogLevel = importTowerLogs.toString();
         this.importTowerLogs = importTowerLogs;
         this.removeColor = removeColor;
         this.templateType = templateType;
         this.importWorkflowChildLogs = importWorkflowChildLogs;
         this.throwExceptionWhenFail = throwExceptionWhenFail;
         this.async = async;
+    }
+
+
+    /** @since 0.16.0 */
+    @DataBoundConstructor
+    public AnsibleTowerStep(
+            @Nonnull String towerServer, @Nonnull String towerCredentialsId, @Nonnull String jobTemplate, String jobType
+    ) {
+        this.towerServer = towerServer;
+        this.towerCredentialsId = towerCredentialsId;
+        this.jobTemplate = jobTemplate;
+        this.jobType = jobType;
     }
 
     @Nonnull
@@ -87,6 +102,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
     public String getScmBranch()                { return scmBranch; }
     public Boolean getVerbose()                 { return verbose; }
     public Boolean getImportTowerLogs()         { return importTowerLogs; }
+    public String getTowerLogLevel()            { return towerLogLevel; }
     public Boolean getRemoveColor()             { return removeColor; }
     public String getTemplateType()             { return templateType; }
     public Boolean getImportWorkflowChildLogs() { return importWorkflowChildLogs; }
@@ -118,7 +134,12 @@ public class AnsibleTowerStep extends AbstractStepImpl {
 	@DataBoundSetter
     public void setVerbose(Boolean verbose) { this.verbose = verbose; }
     @DataBoundSetter
-    public void setImportTowerLogs(Boolean importTowerLogs) { this.importTowerLogs = importTowerLogs; }
+    public void setImportTowerLogs(Boolean importTowerLogs) {
+        this.importTowerLogs = importTowerLogs;
+        this.towerLogLevel = importTowerLogs.toString();
+    }
+    @DataBoundSetter
+    public void setTowerLogLevel(String importTowerLogs) { this.towerLogLevel = importTowerLogs; }
     @DataBoundSetter
     public void setRemoveColor(Boolean removeColor) { this.removeColor = removeColor; }
     @DataBoundSetter
@@ -131,7 +152,6 @@ public class AnsibleTowerStep extends AbstractStepImpl {
     public void setAsync(Boolean async) { this.async = async; }
 
     public boolean isGlobalColorAllowed() {
-        System.out.println("Using the class is global color allowed");
         return true;
     }
 
@@ -149,7 +169,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
         public static final String credential               = AnsibleTower.DescriptorImpl.credential;
         public static final String scmBranch                = AnsibleTower.DescriptorImpl.scmBranch;
         public static final Boolean verbose                 = AnsibleTower.DescriptorImpl.verbose;
-        public static final Boolean importTowerLogs         = AnsibleTower.DescriptorImpl.importTowerLogs;
+        public static final String towerLogLevel            = AnsibleTower.DescriptorImpl.importTowerLogs;
         public static final Boolean removeColor             = AnsibleTower.DescriptorImpl.removeColor;
         public static final String templateType             = AnsibleTower.DescriptorImpl.templateType;
         public static final Boolean importWorkflowChildLogs = AnsibleTower.DescriptorImpl.importWorkflowChildLogs;
@@ -193,8 +213,16 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             return items;
         }
 
+        public ListBoxModel doFillTowerLogLevelItems() {
+            ListBoxModel items = new ListBoxModel();
+            items.add("Do not import", "false");
+            items.add("Import Truncated Logs", "true");
+            items.add("Import Full Logs", "full");
+            items.add("Process Variables Only", "vars");
+            return items;
+        }
+
         public boolean isGlobalColorAllowed() {
-            System.out.println("Using the descriptor is global color allowed");
             return true;
         }
 
@@ -259,8 +287,8 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             if(step.getScmBranch() != null) { scmBranch = step.getScmBranch(); }
             boolean verbose = false;
             if(step.getVerbose() != null) { verbose = step.getVerbose(); }
-            boolean importTowerLogs = false;
-            if(step.getImportTowerLogs() != null) { importTowerLogs = step.getImportTowerLogs(); }
+            String towerLogLevel = "false";
+            if(step.getTowerLogLevel() != null) { towerLogLevel = step.getTowerLogLevel(); }
             boolean removeColor = false;
             if(step.getRemoveColor() != null) { removeColor = step.getRemoveColor(); }
             String templateType = "job";
@@ -274,7 +302,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             Properties map = new Properties();
             boolean runResult = runner.runJobTemplate(
                     listener.getLogger(), step.getTowerServer(), towerCredentialsId, step.getJobTemplate(), jobType, extraVars,
-                    limit, tags, skipTags, inventory, credential, scmBranch, verbose, importTowerLogs, removeColor, envVars,
+                    limit, tags, skipTags, inventory, credential, scmBranch, verbose, towerLogLevel, removeColor, envVars,
                     templateType, importWorkflowChildLogs, ws, run, map, async
             );
             if(!runResult && throwExceptionWhenFail) {

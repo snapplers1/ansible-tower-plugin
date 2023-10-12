@@ -65,6 +65,7 @@ public class TowerConnector implements Serializable {
     private HashMap<Integer, Integer> logIdForJobs = new HashMap<Integer, Integer>();
 
     private boolean removeColor = true;
+    private boolean getFullLogs = false;
     private HashMap<String, String> jenkinsExports = new HashMap<String, String>();
 
     public TowerConnector(String url, String username, String password) { this(url, username, password, null, false, false); }
@@ -97,6 +98,7 @@ public class TowerConnector implements Serializable {
     }
     public void setRemoveColor(boolean removeColor) { this.removeColor = removeColor;}
     public void setGetWorkflowChildLogs(boolean importChildWorkflowLogs) { this.importChildWorkflowLogs = importChildWorkflowLogs; }
+    public void setGetFullLogs(boolean getFullLogs) { this.getFullLogs = getFullLogs; }
     public HashMap<String, String> getJenkinsExports() { return jenkinsExports; }
 
     private DefaultHttpClient getHttpClient() throws AnsibleTowerException {
@@ -893,9 +895,11 @@ public class TowerConnector implements Serializable {
             if(line.matches("^.*JENKINS_EXPORT.*$")) {
                 // The value might have some ansi color on it so we need to force the removal  of it
                 String[] entities = removeColor(line).split("=", 2);
-                entities[0] = entities[0].replaceAll(".*JENKINS_EXPORT ", "");
-                entities[1] = entities[1].replaceAll("\"$", "");
-                jenkinsExports.put( entities[0], entities[1]);
+                if(entities.length == 2) {
+                    entities[0] = entities[0].replaceAll(".*JENKINS_EXPORT ", "");
+                    entities[1] = entities[1].replaceAll("\"$", "");
+                    jenkinsExports.put(entities[0], entities[1]);
+                }
             }
             if(removeColor) {
                 // This regex was found on https://stackoverflow.com/questions/14652538/remove-ascii-color-codes
@@ -989,8 +993,16 @@ public class TowerConnector implements Serializable {
                 }
                 if (responseObject.containsKey("results")) {
                     for (Object anEvent : responseObject.getJSONArray("results")) {
-                        Integer eventId = ((JSONObject) anEvent).getInt("id");
-                        String stdOut = ((JSONObject) anEvent).getString("stdout");
+                        JSONObject eventObject = (JSONObject) anEvent;
+                        Integer eventId = eventObject.getInt("id");
+                        String stdOut = eventObject.getString("stdout");
+                        if(this.getFullLogs) {
+                            try {
+                                stdOut = eventObject.getJSONObject("event_data").getJSONObject("res").getString("msg");
+                            } catch (Exception e) {
+                                // If we don't have this its ok, not all messages will have the res
+                            }
+                        }
                         events.addAll(logLine(stdOut));
                         if (eventId > this.logIdForJobs.get(jobID)) {
                             this.logIdForJobs.put(jobID, eventId);

@@ -24,7 +24,7 @@ public class AnsibleTowerRunner {
     public boolean runJobTemplate(
             PrintStream logger, String towerServer, String towerCredentialsId, String jobTemplate, String jobType,
             String extraVars, String limit, String jobTags, String skipJobTags, String inventory, String credential, String scmBranch,
-            boolean verbose, boolean importTowerLogs, boolean removeColor, EnvVars envVars, String templateType,
+            boolean verbose, String importTowerLogs, boolean removeColor, EnvVars envVars, String templateType,
             boolean importWorkflowChildLogs, FilePath ws, Run<?, ?> run, Properties towerResults
     ) {
         return this.runJobTemplate(logger, towerServer, towerCredentialsId, jobTemplate, jobType, extraVars, limit,
@@ -35,7 +35,7 @@ public class AnsibleTowerRunner {
     public boolean runJobTemplate(
             PrintStream logger, String towerServer, String towerCredentialsId, String jobTemplate, String jobType,
             String extraVars, String limit, String jobTags, String skipJobTags, String inventory, String credential, String scmBranch,
-            boolean verbose, boolean importTowerLogs, boolean removeColor, EnvVars envVars, String templateType,
+            boolean verbose, String importTowerLogs, boolean removeColor, EnvVars envVars, String templateType,
             boolean importWorkflowChildLogs, FilePath ws, Run<?, ?> run, Properties towerResults, boolean async
     ) {
         if (verbose) {
@@ -63,6 +63,12 @@ public class AnsibleTowerRunner {
             this.myJob.setTemplateType(templateType);
         } catch(AnsibleTowerException e) {
             logger.println("ERROR: "+ e);
+            return false;
+        }
+
+        // Check the import logs settings
+        if (!(importTowerLogs.matches("false") || importTowerLogs.matches("true") || importTowerLogs.matches("vars") || importTowerLogs.matches("full"))) {
+            logger.println("ERROR: Import Tower Logs must be one of (false, true, vars or full)");
             return false;
         }
 
@@ -197,7 +203,7 @@ public class AnsibleTowerRunner {
         }
 
         try {
-            this.myJob.setJobId(myTowerConnection.submitTemplate(template.getInt("id"), expandedExtraVars, expandedLimit, expandedJobTags, expandedSkipJobTags, jobType, expandedInventory, expandedCredential, scmBranch, templateType));
+            this.myJob.setJobId(myTowerConnection.submitTemplate(template.getInt("id"), expandedExtraVars, expandedLimit, expandedJobTags, expandedSkipJobTags, jobType, expandedInventory, expandedCredential, expandedScmBranch, templateType));
         } catch (AnsibleTowerException e) {
             logger.println("ERROR: Unable to request job template invocation " + e.getMessage());
             myTowerConnection.releaseToken();
@@ -217,6 +223,8 @@ public class AnsibleTowerRunner {
         }
 
         boolean jobCompleted = false;
+        // Assume the old logging behaviour (truncated logs) but we we are doing full logging or var logging then swtich to true
+        if (importTowerLogs.matches("full") || importTowerLogs.matches("vars")) { myTowerConnection.setGetFullLogs(true); }
         while (!jobCompleted) {
             if(Thread.currentThread().isInterrupted()) {
                 myTowerConnection.releaseToken();
@@ -224,18 +232,15 @@ public class AnsibleTowerRunner {
             }
 
             // First log any events if the user wants them
-            if (importTowerLogs) {
-                try {
-                    for (String event : this.myJob.getLogs()) {
-                        logger.println(event);
-                    }
-                } catch (AnsibleTowerException e) {
-                    logger.println("ERROR: Failed to get job events from tower: " + e.getMessage());
-                    myTowerConnection.releaseToken();
-                    return false;
-                }
-            }
             try {
+                this.getJobLogs(importTowerLogs, logger);
+            } catch (AnsibleTowerException e) {
+                logger.println("ERROR: Failed to get job events from tower: " + e.getMessage());
+                myTowerConnection.releaseToken();
+                return false;
+            }
+
+           try {
                 jobCompleted = this.myJob.isComplete();
             } catch (AnsibleTowerException e) {
                 logger.println("ERROR: Failed to get job status from Tower: " + e.getMessage());
@@ -259,16 +264,12 @@ public class AnsibleTowerRunner {
         // One final log of events (if we want them)
         // Note, that a job can complete long before Tower has finished consuming the logs. This can cause incomplete
         //    logs within Jenkins.
-        if(importTowerLogs) {
-            try {
-                for (String event : this.myJob.getLogs()) {
-                    logger.println(event);
-                }
-            } catch (AnsibleTowerException e) {
-                logger.println("ERROR: Failed to get final job events from tower: " + e.getMessage());
-                myTowerConnection.releaseToken();
-                return false;
-            }
+        try {
+            this.getJobLogs(importTowerLogs, logger);
+        } catch (AnsibleTowerException e) {
+            logger.println("ERROR: Failed to get final job events from tower: " + e.getMessage());
+            myTowerConnection.releaseToken();
+            return false;
         }
 
         boolean wasSuccessful;
@@ -325,6 +326,18 @@ public class AnsibleTowerRunner {
 
         myTowerConnection.releaseToken();
         return wasSuccessful;
+    }
+
+    public void getJobLogs(String importTowerLogs, PrintStream logger) throws AnsibleTowerException {
+        if (importTowerLogs.matches("false")) { return; }
+
+        // If we are anything but false we have to pull the logs
+        for (String event : this.myJob.getLogs()) {
+            // However, if we are doing this for vars only then we don't need to display the logs
+            if (! importTowerLogs.matches("vars")) {
+                logger.println(event);
+            }
+        }
     }
 
     public boolean cancelJob(PrintStream logger) {
